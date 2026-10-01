@@ -1047,7 +1047,7 @@ start('tools — the model-facing boundary');
 start('probe — the host decides whether the folder is real');
 {
   const home = makeHome('probe');
-  const { skills, store } = makeWorld(home);
+  const { skills, store, tools, managed } = makeWorld(home);
   const probeDir = join(skills.learnedDir, 'learn-root-probe');
 
   const blind = await probeLearnedRoot({ ctx: {}, skills, store });
@@ -1065,6 +1065,25 @@ start('probe — the host decides whether the folder is real');
   const live = await probeLearnedRoot({ ctx: { skills: watching }, skills, store });
   eq('a catalog that reports it back proves the root', live.live, true);
   eq('the probe is cleaned up afterwards', existsSync(probeDir), false);
+
+  // `待收拢` is a promise to move a file, so it may only appear on a skill this
+  // plugin is willing to move. A hand-written skill in the shared root stays
+  // where the user put it — organize says so out loud, and status must agree.
+  // The probe only REPORTS the answer; activation is what hands it to the
+  // skills service (`skills.setLive` at `_agent-learning\lib\index.js:102`), so
+  // this wires the two together exactly the way activation does.
+  skills.setLive(live.live);
+  eq('the successful probe makes the root live', skills.isLive(), true);
+  const shared = join(skills.legacyRoot, 'hand-written');
+  mkdirSync(shared, { recursive: true });
+  writeFileSync(join(shared, 'SKILL.md'), '---\nname: hand-written\ndescription: 用户自己写的\n---\n\n# x\n', 'utf8');
+  const withForeign = await call(tools.learn, { action: 'status' });
+  check('status does not promise to collect a hand-written skill', !/hand-written（[^）]*待收拢/.test(withForeign), withForeign);
+  check('but still lists it', /hand-written/.test(withForeign), withForeign);
+
+  managed.claim('hand-written', { kind: 'learned', source: 'test' });
+  const withOurs = await call(tools.learn, { action: 'status' });
+  check('once it is ours, the same row says 待收拢', /hand-written（[^）]*待收拢/.test(withOurs), withOurs);
 
   const deaf = await probeLearnedRoot({ ctx: { skills: { async list() { return []; } } }, skills, store });
   eq('a catalog that stays silent is not proof', deaf.live, false);

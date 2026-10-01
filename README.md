@@ -12,7 +12,7 @@
 | 落盘时机 | 模型显式决定（`learn_skill_manage create` / `learn action=note`） |
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
-| 自测 | `npm test` —— 17 节，354 条断言，零依赖 |
+| 自测 | `npm test` —— 17 节，358 条断言，零依赖 |
 
 ---
 
@@ -210,6 +210,30 @@ learn action=organize dryRun=false
 `edit: Error: old_string matched 2 times …; provide a more specific old_string or set replace_all to true`），
 其余全部带着具名理由被拒。修 callId 之前，同样一次重放产出的是匿名的 `": Error: …"`。
 
+### v0.2.2：专属根不再求宿主，改成自己提供
+
+两个症状（`learned_root_live: false`、`durable-preferences` 一直显示 `external` 没被收编）其实是同一个病：
+插件一直在**请求宿主**把 `<DSH_HOME>/skills/learned` 登记成技能根——往 `<profileDir>/cordis.patch.yml` 里加一条
+`customSkillDirs`。那条补丁能被 loader 合并，却什么都不会发生：它落在宿主平面那一行 `skill-filesystem`
+（`@deepseek-ai/dsh-web-app` 把它设成 `disabled: true`），而顶层 id 补丁只覆盖它自己重述的键。
+
+改法是插件**自己**提供那个根：`lib/provider.js` 用 `ctx.inject(['skills'], …)` 拿到 `skills` 服务，
+再 `registerProvider()` 注册一个只扫专属目录的提供者，`rank: 330`——夹在 `custom`(300) 与 `user-dsh`(400)
+之间，所以学到的技能压得住共享根里的旧副本，而项目根（100/200）仍然优先。
+这条路的形状决定了模块的写法：`@deepseek-ai/dsh-skill` 的 `validateCandidate` 在遇到畸形行时是 **throw**，
+一次 throw 会打断整个 collect，**所有根里的所有技能一起消失**——所以 `list()` 必须自己把宿主会拒的行全部过滤掉
+（名字不合 `/^[a-z0-9]+(?:-[a-z0-9]+)*$/`、没有 `SKILL.md`、描述为空……），而不是指望宿主容忍。
+
+### v0.2.3：三处「输出比实际乐观」的谎
+
+代码改对了，但工具**说**的话还停留在旧设计上。三条都是看着真实输出抓出来的：
+
+| # | 症状 | 修法 |
+|---|---|---|
+| 27 | `learn action=doctor` 永远红着：`legacy` 检查是纯按位置的（`legacy: !inLearned(name)`），于是用户手写、插件**永远不该搬**的技能（`zz-user-probe`）让自检一直报 `自检发现问题` | 判据改成归属：只有 `managed.isManaged(name)` 或 `BUILTIN_PROTECTED` 里的遗留项才算异常；不是自己的，明说「位置由你说了算，不动」 |
+| 28 | 同一个 doctor 在 `host-root` 失败分支里，还在教用户去改 `cordis.patch.yml` 加 `customSkillDirs`——那条路在 v0.2.2 里已经删掉了，用户照着做只会白忙 | 改成 provider 的说法（注册发生在 `ctx.skills.registerProvider()`；改完重启 DSH；还是不行说明宿主 `skills` 服务没就绪） |
+| 29 | `learn action=status` 给共享根里的**别人**的技能打 `待收拢` 标签，等于承诺一次 `organize` 永远不会做的搬迁 | 标签的条件从 `legacy && live` 收紧到 `legacy && live && 归属是自己`，与 `organize` 的真实行为对齐 |
+
 ---
 
 ## 磁盘布局
@@ -379,7 +403,7 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-354/354 checks passed — all green
+358/358 checks passed — all green
 ```
 
 「真实对话里的假阳性回归」那一节把**跑挂过插件的原话逐字抄进去**当夹具（含那 240 字的 PowerShell 脚本原文、
