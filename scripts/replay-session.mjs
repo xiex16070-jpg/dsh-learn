@@ -1,1 +1,253 @@
-IyEvdXNyL2Jpbi9lbnYgbm9kZQovKioKICogUmVwbGF5IGEgcmVhbCBEU0ggc2Vzc2lvbiB0aHJvdWdoIHRoZSBwbHVnaW4gYW5kIHJlcG9ydCB3aGF0IGl0IHdvdWxkIGxlYXJuLgogKgogKiBFdmVyeSBvdGhlciB0ZXN0IGluIHRoaXMgZGlyZWN0b3J5IGZlZWRzIHRoZSBwbHVnaW4gdGV4dCB0aGF0IGEgaHVtYW4gY2hvc2UuCiAqIFRoaXMgb25lIGZlZWRzIGl0IGEgc2Vzc2lvbiB0aGF0IGFjdHVhbGx5IGhhcHBlbmVkLCBpbiB0aGUgb3JkZXIgaXQgaGFwcGVuZWQsCiAqIHRocm91Z2ggdGhlIHJlYWwgZXZlbnQgaGFuZGxlciDigJQgd2hpY2ggaXMgdGhlIG9ubHkgd2F5IHRvIGFuc3dlciB0aGUgcXVlc3Rpb24KICogdGhlIHVuaXQgdGVzdHMgY2Fubm90OiBkb2VzIGl0IHdvcmsgb24gbXkgY29udmVyc2F0aW9ucz8KICoKICogQSBzZXNzaW9uIGZpbGUgaXMgYSBzZXF1ZW5jZSBvZiBjb25jYXRlbmF0ZWQgenN0ZCBmcmFtZXMsIG9uZSBwZXIgYXBwZW5kLCBzbwogKiBgenN0ZERlY29tcHJlc3NTeW5jYCBvbiB0aGUgd2hvbGUgZmlsZSByZXR1cm5zIG9ubHkgdGhlIGZpcnN0IGZyYW1lLiBFYWNoCiAqIGZyYW1lIGlzIGRlY29kZWQgc2VwYXJhdGVseSBoZXJlLgogKgogKiBVc2FnZToKICogICBub2RlIHNjcmlwdHMvcmVwbGF5LXNlc3Npb24ubWpzICAgICAgICAgICAgICAgICAgICAgICMgbmV3ZXN0IHNlc3Npb24KICogICBub2RlIHNjcmlwdHMvcmVwbGF5LXNlc3Npb24ubWpzIC0tbGF0ZXN0IDUgICAgICAgICAgICMgdGhlIG5ld2VzdCA1CiAqICAgbm9kZSBzY3JpcHRzL3JlcGxheS1zZXNzaW9uLm1qcyAtLXNlc3Npb24gPGZpbGU+CiAqICAgbm9kZSBzY3JpcHRzL3JlcGxheS1zZXNzaW9uLm1qcyAtLWRzaC1ob21lIDxkaXI+ICAgICAjIHRocm93YXdheSBsaWJyYXJ5CiAqLwppbXBvcnQgeyByZWFkZGlyU3luYywgcmVhZEZpbGVTeW5jLCBzdGF0U3luYyB9IGZyb20gJ25vZGU6ZnMnOwppbXBvcnQgeyBqb2luIH0gZnJvbSAnbm9kZTpwYXRoJzsKaW1wb3J0IHsgaG9tZWRpciB9IGZyb20gJ25vZGU6b3MnOwppbXBvcnQgemxpYiBmcm9tICdub2RlOnpsaWInOwoKY29uc3QgYXJncyA9IHByb2Nlc3MuYXJndi5zbGljZSgyKTsKLyoqCiAqIGAtLW5hbWU9dmFsdWVgIGFuZCBgLS1uYW1lIHZhbHVlYCBib3RoIHdvcmsuIEEgZmxhZyB3aXRoIG5vIHZhbHVlIGlzIGB0cnVlYC4KICogQWNjZXB0aW5nIHRoZSBzcGFjZWQgZm9ybSBtYXR0ZXJzOiBgLS1kc2gtaG9tZSBDOlxzb21lXGRpcmAgdXNlZCB0byByZXNvbHZlIHRvCiAqIHRoZSBib29sZWFuIGB0cnVlYCwgd2hpY2ggYFN0cmluZygpYCB0dXJuZWQgaW50byBhIGRpcmVjdG9yeSBsaXRlcmFsbHkgbmFtZWQKICogYHRydWVgIGluIHRoZSBjdXJyZW50IHdvcmtpbmcgZGlyZWN0b3J5IOKAlCBhIHNpbGVudCwgdmVyeSBjb25mdXNpbmcgbWlzZmlyZS4KICovCmNvbnN0IGZsYWcgPSAobmFtZSwgZmFsbGJhY2sgPSBudWxsKSA9PiB7CiAgY29uc3QgZXEgPSBhcmdzLmZpbmRJbmRleCgoZW50cnkpID0+IGVudHJ5LnN0YXJ0c1dpdGgoYCR7bmFtZX09YCkpOwogIGlmIChlcSAhPT0gLTEpIHJldHVybiBhcmdzW2VxXS5zbGljZShuYW1lLmxlbmd0aCArIDEpOwogIGNvbnN0IGJhcmUgPSBhcmdzLmluZGV4T2YobmFtZSk7CiAgaWYgKGJhcmUgPT09IC0xKSByZXR1cm4gZmFsbGJhY2s7CiAgY29uc3QgbmV4dCA9IGFyZ3NbYmFyZSArIDFdOwogIHJldHVybiBuZXh0ID09PSB1bmRlZmluZWQgfHwgbmV4dC5zdGFydHNXaXRoKCctLScpID8gdHJ1ZSA6IG5leHQ7Cn07CgovLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tIHpzdGQgZnJhbWluZwoKY29uc3QgWlNURF9NQUdJQyA9IEJ1ZmZlci5mcm9tKFsweDI4LCAweGI1LCAweDJmLCAweGZkXSk7CgpleHBvcnQgZnVuY3Rpb24gZGVjb2RlU2Vzc2lvbkZpbGUoZmlsZSkgewogIGNvbnN0IHJhdyA9IHJlYWRGaWxlU3luYyhmaWxlKTsKICBjb25zdCBvZmZzZXRzID0gW107CiAgbGV0IGF0ID0gcmF3LmluZGV4T2YoWlNURF9NQUdJQywgMCk7CiAgd2hpbGUgKGF0ICE9PSAtMSkgewogICAgb2Zmc2V0cy5wdXNoKGF0KTsKICAgIGF0ID0gcmF3LmluZGV4T2YoWlNURF9NQUdJQywgYXQgKyAxKTsKICB9CiAgaWYgKCFvZmZzZXRzLmxlbmd0aCkgcmV0dXJuIHJhdy50b1N0cmluZygndXRmOCcpOwogIGNvbnN0IHBhcnRzID0gW107CiAgZm9yIChsZXQgaSA9IDA7IGkgPCBvZmZzZXRzLmxlbmd0aDsgaSArPSAxKSB7CiAgICBjb25zdCBmcmFtZSA9IHJhdy5zdWJhcnJheShvZmZzZXRzW2ldLCBpICsgMSA8IG9mZnNldHMubGVuZ3RoID8gb2Zmc2V0c1tpICsgMV0gOiByYXcubGVuZ3RoKTsKICAgIHRyeSB7CiAgICAgIHBhcnRzLnB1c2goemxpYi56c3RkRGVjb21wcmVzc1N5bmMoZnJhbWUpLnRvU3RyaW5nKCd1dGY4JykpOwogICAgfSBjYXRjaCB7CiAgICAgIC8vIEEgbWFnaWMgc2VxdWVuY2UgaW5zaWRlIGNvbXByZXNzZWQgcGF5bG9hZCwgbm90IGEgZnJhbWUgYm91bmRhcnkuCiAgICB9CiAgfQogIHJldHVybiBwYXJ0cy5qb2luKCcnKTsKfQoKZXhwb3J0IGZ1bmN0aW9uIHJlYWRFdmVudHMoZmlsZSkgewogIHJldHVybiBkZWNvZGVTZXNzaW9uRmlsZShmaWxlKQogICAgLnNwbGl0KCdcbicpCiAgICAuZmlsdGVyKChsaW5lKSA9PiBsaW5lLnRyaW0oKSkKICAgIC5tYXAoKGxpbmUpID0+IHsKICAgICAgdHJ5IHsKICAgICAgICByZXR1cm4gSlNPTi5wYXJzZShsaW5lKTsKICAgICAgfSBjYXRjaCB7CiAgICAgICAgcmV0dXJuIG51bGw7CiAgICAgIH0KICAgIH0pCiAgICAuZmlsdGVyKEJvb2xlYW4pOwp9CgovLyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tIHNlc3Npb24gZGlzY292ZXJ5CgpmdW5jdGlvbiBmaW5kU2Vzc2lvbnMocm9vdCkgewogIGNvbnN0IGZvdW5kID0gW107CiAgY29uc3Qgd2FsayA9IChkaXIsIGRlcHRoKSA9PiB7CiAgICBpZiAoZGVwdGggPiAzKSByZXR1cm47CiAgICBsZXQgZW50cmllcyA9IFtdOwogICAgdHJ5IHsKICAgICAgZW50cmllcyA9IHJlYWRkaXJTeW5jKGRpciwgeyB3aXRoRmlsZVR5cGVzOiB0cnVlIH0pOwogICAgfSBjYXRjaCB7CiAgICAgIHJldHVybjsKICAgIH0KICAgIGZvciAoY29uc3QgZW50cnkgb2YgZW50cmllcykgewogICAgICBjb25zdCBmdWxsID0gam9pbihkaXIsIGVudHJ5Lm5hbWUpOwogICAgICBpZiAoZW50cnkuaXNEaXJlY3RvcnkoKSkgd2FsayhmdWxsLCBkZXB0aCArIDEpOwogICAgICBlbHNlIGlmIChlbnRyeS5uYW1lID09PSAnc2Vzc2lvbi52NC5qc29ubC56c3RkJykgewogICAgICAgIHRyeSB7CiAgICAgICAgICBmb3VuZC5wdXNoKHsgZmlsZTogZnVsbCwgbXRpbWU6IHN0YXRTeW5jKGZ1bGwpLm10aW1lTXMsIHNpemU6IHN0YXRTeW5jKGZ1bGwpLnNpemUgfSk7CiAgICAgICAgfSBjYXRjaCB7CiAgICAgICAgICAvKiByYWNlZCBhd2F5ICovCiAgICAgICAgfQogICAgICB9CiAgICB9CiAgfTsKICB3YWxrKHJvb3QsIDApOwogIHJldHVybiBmb3VuZC5zb3J0KChhLCBiKSA9PiBiLm10aW1lIC0gYS5tdGltZSk7Cn0KCi8vIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0gY29yZGlzIHN0dWIKCmZ1bmN0aW9uIG1ha2VDdHgobG9ncykgewogIGNvbnN0IGhhbmRsZXJzID0gbmV3IE1hcCgpOwogIGNvbnN0IHRvb2xzID0gbmV3IE1hcCgpOwogIGNvbnN0IHNlcnZpY2VzID0gbmV3IE1hcCgpOwogIGNvbnN0IGN0eCA9IHsKICAgIGxvZ2dlcjogewogICAgICBpbmZvOiAobXNnKSA9PiBsb2dzLnB1c2goYFtpbmZvXSAke21zZ31gKSwKICAgICAgd2FybjogKG1zZykgPT4gbG9ncy5wdXNoKGBbd2Fybl0gJHttc2d9YCksCiAgICAgIGVycm9yOiAobXNnKSA9PiBsb2dzLnB1c2goYFtlcnJvcl0gJHttc2d9YCksCiAgICAgIGRlYnVnOiAoKSA9PiB7fSwKICAgIH0sCiAgICBvbihldmVudCwgaGFuZGxlcikgewogICAgICBpZiAoIWhhbmRsZXJzLmhhcyhldmVudCkpIGhhbmRsZXJzLnNldChldmVudCwgW10pOwogICAgICBoYW5kbGVycy5nZXQoZXZlbnQpLnB1c2goaGFuZGxlcik7CiAgICAgIHJldHVybiAoKSA9PiB7fTsKICAgIH0sCiAgICBlZmZlY3QoZm4pIHsKICAgICAgdHJ5IHsKICAgICAgICBjb25zdCBkaXNwb3NlID0gZm4oKTsKICAgICAgICByZXR1cm4gdHlwZW9mIGRpc3Bvc2UgPT09ICdmdW5jdGlvbicgPyBkaXNwb3NlIDogKCkgPT4ge307CiAgICAgIH0gY2F0Y2ggewogICAgICAgIHJldHVybiAoKSA9PiB7fTsKICAgICAgfQogICAgfSwKICAgIGdldDogKG5hbWUpID0+IHNlcnZpY2VzLmdldChuYW1lKSwKICAgIHNldDogKG5hbWUsIHZhbHVlKSA9PiBzZXJ2aWNlcy5zZXQobmFtZSwgdmFsdWUpLAogICAgcHJvdmlkZTogKG5hbWUsIHZhbHVlKSA9PiBzZXJ2aWNlcy5zZXQobmFtZSwgdmFsdWUpLAogICAgdG9vbHM6IHsKICAgICAgcmVnaXN0ZXIoZGVmaW5pdGlvbikgewogICAgICAgIHRvb2xzLnNldChkZWZpbml0aW9uLm5hbWUsIGRlZmluaXRpb24pOwogICAgICAgIHJldHVybiAoKSA9PiB0b29scy5kZWxldGUoZGVmaW5pdGlvbi5uYW1lKTsKICAgICAgfSwKICAgIH0sCiAgICBza2lsbHM6IHVuZGVmaW5lZCwKICB9OwogIHJldHVybiB7IGN0eCwgaGFuZGxlcnMsIHRvb2xzIH07Cn0KCmZ1bmN0aW9uIGVtaXQoaGFuZGxlcnMsIHNlc3Npb24sIGV2ZW50KSB7CiAgZm9yIChjb25zdCBoYW5kbGVyIG9mIGhhbmRsZXJzLmdldCgnc2Vzc2lvbi9ldmVudCcpIHx8IFtdKSBoYW5kbGVyKHNlc3Npb24sIGV2ZW50KTsKfQoKLy8gLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLSBtYWluCgpjb25zdCBkc2hIb21lID0gU3RyaW5nKGZsYWcoJy0tZHNoLWhvbWUnLCBqb2luKHByb2Nlc3MuZW52LlRFTVAgfHwgaG9tZWRpcigpLCBgbGVhcm4tcmVwbGF5LSR7cHJvY2Vzcy5waWR9YCkpKTsKcHJvY2Vzcy5lbnYuRFNIX0hPTUUgPSBkc2hIb21lOwpwcm9jZXNzLmVudi5EU0hfUFJPRklMRV9ESVIgPSBqb2luKGRzaEhvbWUsICdwcm9maWxlJyk7Cgpjb25zdCB7IG5vcm1hbGl6ZUNvbmZpZyB9ID0gYXdhaXQgaW1wb3J0KCcuLi9saWIvY29uZmlnLmpzJyk7CmNvbnN0IHsgYXBwbHlJbXBsIH0gPSBhd2FpdCBpbXBvcnQoJy4uL2xpYi9pbmRleC5qcycpOwoKY29uc3Qgc2Vzc2lvbnNSb290ID0gU3RyaW5nKGZsYWcoJy0tc2Vzc2lvbnMnLCBqb2luKGhvbWVkaXIoKSwgJy5kc2gnLCAnc2Vzc2lvbnMnKSkpOwpsZXQgZmlsZXMgPSBbXTsKY29uc3QgZXhwbGljaXQgPSBmbGFnKCctLXNlc3Npb24nKTsKaWYgKGV4cGxpY2l0ICYmIGV4cGxpY2l0ICE9PSB0cnVlKSBmaWxlcyA9IFtTdHJpbmcoZXhwbGljaXQpXTsKZWxzZSB7CiAgY29uc3QgY291bnQgPSBOdW1iZXIoZmxhZygnLS1sYXRlc3QnLCAxKSkgfHwgMTsKICBmaWxlcyA9IGZpbmRTZXNzaW9ucyhzZXNzaW9uc1Jvb3QpLnNsaWNlKDAsIGNvdW50KS5tYXAoKGVudHJ5KSA9PiBlbnRyeS5maWxlKTsKfQoKaWYgKCFmaWxlcy5sZW5ndGgpIHsKICBjb25zb2xlLmxvZyhg5rKh5pyJ5om+5Yiw5Lya6K+d5paH5Lu277yI5ZyoICR7c2Vzc2lvbnNSb290fSDkuIvvvIlgKTsKICBwcm9jZXNzLmV4aXQoMCk7Cn0KCmNvbnN0IGxvZ3MgPSBbXTsKY29uc3QgeyBjdHgsIGhhbmRsZXJzLCB0b29scyB9ID0gbWFrZUN0eChsb2dzKTsKCmNvbnN0IGNvbmZpZyA9IG5vcm1hbGl6ZUNvbmZpZyh7IGRzaEhvbWUgfSk7CmFwcGx5SW1wbChjdHgsIHsgZHNoSG9tZSB9KTsKCmNvbnNvbGUubG9nKGDlm57mlL7lupPvvJoke2RzaEhvbWV9YCk7CmNvbnNvbGUubG9nKGDms6jlhozlt6XlhbfvvJoke1suLi50b29scy5rZXlzKCldLmpvaW4oJywgJyl9YCk7CmNvbnNvbGUubG9nKCcnKTsKCmZvciAoY29uc3QgZmlsZSBvZiBmaWxlcykgewogIGNvbnN0IGV2ZW50cyA9IHJlYWRFdmVudHMoZmlsZSk7CiAgY29uc3Qgc2Vzc2lvbklkID0gKGV2ZW50cy5maW5kKChldmVudCkgPT4gZXZlbnQudHlwZSA9PT0gJ3Nlc3Npb24nKSB8fCB7fSkuaWQgfHwgZmlsZTsKICBjb25zdCBjb3VudHMgPSB7IHVzZXI6IDAsIGFzc2lzdGFudDogMCwgdG9vbDogMCB9OwogIGZvciAoY29uc3QgZXZlbnQgb2YgZXZlbnRzKSB7CiAgICBpZiAoZXZlbnQudHlwZSA9PT0gJ3VzZXIvbWVzc2FnZScpIGNvdW50cy51c2VyICs9IDE7CiAgICBpZiAoZXZlbnQudHlwZSA9PT0gJ2Fzc2lzdGFudC9tZXNzYWdlJykgY291bnRzLmFzc2lzdGFudCArPSAxOwogICAgaWYgKGV2ZW50LnR5cGUgPT09ICd0b29sL3Jlc3VsdCcpIGNvdW50cy50b29sICs9IDE7CiAgICBlbWl0KGhhbmRsZXJzLCB7IGlkOiBzZXNzaW9uSWQgfSwgZXZlbnQpOwogIH0KICBjb25zb2xlLmxvZyhgJHtzZXNzaW9uSWR9YCk7CiAgY29uc29sZS5sb2coYCAg5LqL5Lu2ICR7ZXZlbnRzLmxlbmd0aH3vvIjnlKjmiLcgJHtjb3VudHMudXNlcn0gwrcg5Yqp5omLICR7Y291bnRzLmFzc2lzdGFudH0gwrcg5bel5YW3ICR7Y291bnRzLnRvb2x977yJYCk7Cn0KCi8vIFRoZSBwbHVnaW4gZGVib3VuY2VzIGl0cyByZXZpZXc7IHJ1biBpdCBub3cgaW5zdGVhZCBvZiB3YWl0aW5nLgpjb25zdCBsZWFybiA9IHRvb2xzLmdldCgnbGVhcm4nKTsKY29uc3QgcmV2aWV3ID0gdG9vbHMuZ2V0KCdsZWFybl9yZXZpZXcnKTsKaWYgKCFsZWFybiB8fCAhcmV2aWV3KSB7CiAgY29uc29sZS5sb2coJ+W3peWFt+ayoeacieazqOWGjOaIkOWKn++8jOaXoOazlee7p+e7rScpOwogIHByb2Nlc3MuZXhpdCgxKTsKfQoKY29uc3QgY2FsbCA9IGFzeW5jIChkZWZpbml0aW9uLCBwYXJhbXMpID0+IHsKICBjb25zdCB2YWx1ZSA9IGF3YWl0IGRlZmluaXRpb24uZXhlY3V0ZShwYXJhbXMsIHsgc2Vzc2lvbjogeyBpZDogJ3JlcGxheScgfSB9KTsKICBjb25zdCBjbGVhbiA9IEpTT04ucGFyc2UoSlNPTi5zdHJpbmdpZnkodmFsdWUpKTsKICByZXR1cm4gdHlwZW9mIGNsZWFuID09PSAnc3RyaW5nJyA/IGNsZWFuIDogSlNPTi5zdHJpbmdpZnkoY2xlYW4sIG51bGwsIDIpOwp9OwoKLy8gYC0tdG9vbCBsZWFybiAtLWFyZ3MgJ3siYWN0aW9uIjoic3RhdHVzIn0nYCBpbnNwZWN0cyBvbmUgdG9vbCBhZ2FpbnN0IHRoZQovLyByZXBsYXllZCBsaWJyYXJ5IGluc3RlYWQgb2YgcnVubmluZyB0aGUgZGVmYXVsdCByZXZpZXcgc2VxdWVuY2UuCmNvbnN0IG9ubHkgPSBmbGFnKCctLXRvb2wnKTsKaWYgKG9ubHkpIHsKICBjb25zdCBkZWZpbml0aW9uID0gdG9vbHMuZ2V0KG9ubHkpOwogIGlmICghZGVmaW5pdGlvbikgewogICAgY29uc29sZS5sb2coYOayoeaciei/meS4quW3peWFt++8miR7b25seX3jgILlt7Lms6jlhozvvJoke1suLi50b29scy5rZXlzKCldLmpvaW4oJywgJyl9YCk7CiAgICBwcm9jZXNzLmV4aXQoMSk7CiAgfQogIGxldCBwYXJhbXMgPSB7fTsKICBjb25zdCByYXcgPSBmbGFnKCctLWFyZ3MnKTsKICBpZiAocmF3KSB7CiAgICB0cnkgewogICAgICBwYXJhbXMgPSBKU09OLnBhcnNlKHJhdyk7CiAgICB9IGNhdGNoIChlcnJvcikgewogICAgICBjb25zb2xlLmxvZyhgLS1hcmdzIOS4jeaYr+WQiOazlSBKU09O77yaJHtlcnJvci5tZXNzYWdlfWApOwogICAgICBwcm9jZXNzLmV4aXQoMSk7CiAgICB9CiAgfQogIGNvbnNvbGUubG9nKGF3YWl0IGNhbGwoZGVmaW5pdGlvbiwgcGFyYW1zKSk7CiAgY29uc29sZS5sb2coJycpOwogIGNvbnNvbGUubG9nKGDvvIjlm57mlL7lupPnlZnlnKggJHtkc2hIb21lfe+8jOajgOafpeWujOWPr+S7peaVtOS4quWIoOaOieOAgu+8iWApOwogIHByb2Nlc3MuZXhpdCgwKTsKfQoKY29uc29sZS5sb2coJycpOwpjb25zb2xlLmxvZygnPT09IOiHquWKqOWuoeafpe+8iOWPquaPkOWHuuWAmemAie+8jOS4jeWGmeaWh+S7tu+8iT09PScpOwpjb25zdCBkcnkgPSBhd2FpdCBjYWxsKHJldmlldywgeyBhY3Rpb246ICdkcnktcnVuJyB9KTsKY29uc29sZS5sb2coU3RyaW5nKGRyeSkpOwoKY29uc29sZS5sb2coJycpOwpjb25zb2xlLmxvZygnPT09IOWmguaenOeOsOWcqOecn+eahOi3keS4gOasoe+8jOS8muaPkOWHuuS7gOS5iCA9PT0nKTsKY29uc3QgcmVhbCA9IGF3YWl0IGNhbGwocmV2aWV3LCB7IGFjdGlvbjogJ3J1bicgfSk7CmNvbnNvbGUubG9nKFN0cmluZyhyZWFsKS5zbGljZSgwLCA0MDAwKSk7Cgpjb25zb2xlLmxvZygnJyk7CmNvbnNvbGUubG9nKCc9PT0g6Zif5YiXID09PScpOwpjb25zb2xlLmxvZyhTdHJpbmcoYXdhaXQgY2FsbChsZWFybiwgeyBhY3Rpb246ICdwZW5kaW5nJyB9KSkuc2xpY2UoMCwgNDAwMCkpOwoKY29uc29sZS5sb2coJycpOwpjb25zb2xlLmxvZyhg77yI5Zue5pS+5bqT55WZ5ZyoICR7ZHNoSG9tZX3vvIzmo4Dmn6Xlrozlj6/ku6XmlbTkuKrliKDmjonjgILvvIlgKTsK
+#!/usr/bin/env node
+/**
+ * Replay a real DSH session through the plugin and report what it would learn.
+ *
+ * Every other test in this directory feeds the plugin text that a human chose.
+ * This one feeds it a session that actually happened, in the order it happened,
+ * through the real event handler — which is the only way to answer the question
+ * the unit tests cannot: does it work on my conversations?
+ *
+ * A session file is a sequence of concatenated zstd frames, one per append, so
+ * `zstdDecompressSync` on the whole file returns only the first frame. Each
+ * frame is decoded separately here.
+ *
+ * Usage:
+ *   node scripts/replay-session.mjs                      # newest session
+ *   node scripts/replay-session.mjs --latest 5           # the newest 5
+ *   node scripts/replay-session.mjs --session <file>
+ *   node scripts/replay-session.mjs --dsh-home <dir>     # throwaway library
+ */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+import zlib from 'node:zlib';
+
+const args = process.argv.slice(2);
+/**
+ * `--name=value` and `--name value` both work. A flag with no value is `true`.
+ * Accepting the spaced form matters: `--dsh-home C:\some\dir` used to resolve to
+ * the boolean `true`, which `String()` turned into a directory literally named
+ * `true` in the current working directory — a silent, very confusing misfire.
+ */
+const flag = (name, fallback = null) => {
+  const eq = args.findIndex((entry) => entry.startsWith(`${name}=`));
+  if (eq !== -1) return args[eq].slice(name.length + 1);
+  const bare = args.indexOf(name);
+  if (bare === -1) return fallback;
+  const next = args[bare + 1];
+  return next === undefined || next.startsWith('--') ? true : next;
+};
+
+// ------------------------------------------------------------- zstd framing
+
+const ZSTD_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
+
+export function decodeSessionFile(file) {
+  const raw = readFileSync(file);
+  const offsets = [];
+  let at = raw.indexOf(ZSTD_MAGIC, 0);
+  while (at !== -1) {
+    offsets.push(at);
+    at = raw.indexOf(ZSTD_MAGIC, at + 1);
+  }
+  if (!offsets.length) return raw.toString('utf8');
+  const parts = [];
+  for (let i = 0; i < offsets.length; i += 1) {
+    const frame = raw.subarray(offsets[i], i + 1 < offsets.length ? offsets[i + 1] : raw.length);
+    try {
+      parts.push(zlib.zstdDecompressSync(frame).toString('utf8'));
+    } catch {
+      // A magic sequence inside compressed payload, not a frame boundary.
+    }
+  }
+  return parts.join('');
+}
+
+export function readEvents(file) {
+  return decodeSessionFile(file)
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+// ------------------------------------------------------------- session discovery
+
+function findSessions(root) {
+  const found = [];
+  const walk = (dir, depth) => {
+    if (depth > 3) return;
+    let entries = [];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full, depth + 1);
+      else if (entry.name === 'session.v4.jsonl.zstd') {
+        try {
+          found.push({ file: full, mtime: statSync(full).mtimeMs, size: statSync(full).size });
+        } catch {
+          /* raced away */
+        }
+      }
+    }
+  };
+  walk(root, 0);
+  return found.sort((a, b) => b.mtime - a.mtime);
+}
+
+// ------------------------------------------------------------- cordis stub
+
+function makeCtx(logs) {
+  const handlers = new Map();
+  const tools = new Map();
+  const services = new Map();
+  const ctx = {
+    logger: {
+      info: (msg) => logs.push(`[info] ${msg}`),
+      warn: (msg) => logs.push(`[warn] ${msg}`),
+      error: (msg) => logs.push(`[error] ${msg}`),
+      debug: () => {},
+    },
+    on(event, handler) {
+      if (!handlers.has(event)) handlers.set(event, []);
+      handlers.get(event).push(handler);
+      return () => {};
+    },
+    effect(fn) {
+      try {
+        const dispose = fn();
+        return typeof dispose === 'function' ? dispose : () => {};
+      } catch {
+        return () => {};
+      }
+    },
+    get: (name) => services.get(name),
+    set: (name, value) => services.set(name, value),
+    provide: (name, value) => services.set(name, value),
+    tools: {
+      register(definition) {
+        tools.set(definition.name, definition);
+        return () => tools.delete(definition.name);
+      },
+    },
+    skills: undefined,
+  };
+  return { ctx, handlers, tools };
+}
+
+function emit(handlers, session, event) {
+  for (const handler of handlers.get('session/event') || []) handler(session, event);
+}
+
+// ------------------------------------------------------------- main
+
+const dshHome = String(flag('--dsh-home', join(process.env.TEMP || homedir(), `learn-replay-${process.pid}`)));
+process.env.DSH_HOME = dshHome;
+process.env.DSH_PROFILE_DIR = join(dshHome, 'profile');
+
+const { normalizeConfig } = await import('../lib/config.js');
+const { applyImpl } = await import('../lib/index.js');
+
+const sessionsRoot = String(flag('--sessions', join(homedir(), '.dsh', 'sessions')));
+let files = [];
+const explicit = flag('--session');
+if (explicit && explicit !== true) files = [String(explicit)];
+else {
+  const count = Number(flag('--latest', 1)) || 1;
+  files = findSessions(sessionsRoot).slice(0, count).map((entry) => entry.file);
+}
+
+if (!files.length) {
+  console.log(`没有找到会话文件（在 ${sessionsRoot} 下）`);
+  process.exit(0);
+}
+
+const logs = [];
+const { ctx, handlers, tools } = makeCtx(logs);
+
+const config = normalizeConfig({ dshHome });
+applyImpl(ctx, { dshHome });
+
+console.log(`回放库：${dshHome}`);
+console.log(`注册工具：${[...tools.keys()].join(', ')}`);
+console.log('');
+
+for (const file of files) {
+  const events = readEvents(file);
+  const sessionId = (events.find((event) => event.type === 'session') || {}).id || file;
+  const counts = { user: 0, assistant: 0, tool: 0 };
+  for (const event of events) {
+    if (event.type === 'user/message') counts.user += 1;
+    if (event.type === 'assistant/message') counts.assistant += 1;
+    if (event.type === 'tool/result') counts.tool += 1;
+    emit(handlers, { id: sessionId }, event);
+  }
+  console.log(`${sessionId}`);
+  console.log(`  事件 ${events.length}（用户 ${counts.user} · 助手 ${counts.assistant} · 工具 ${counts.tool}）`);
+}
+
+// The plugin debounces its review; run it now instead of waiting.
+const learn = tools.get('learn');
+const review = tools.get('learn_review');
+if (!learn || !review) {
+  console.log('工具没有注册成功，无法继续');
+  process.exit(1);
+}
+
+const call = async (definition, params) => {
+  const value = await definition.execute(params, { session: { id: 'replay' } });
+  const clean = JSON.parse(JSON.stringify(value));
+  return typeof clean === 'string' ? clean : JSON.stringify(clean, null, 2);
+};
+
+// `--tool learn --args '{"action":"status"}'` inspects one tool against the
+// replayed library instead of running the default review sequence.
+const only = flag('--tool');
+if (only) {
+  const definition = tools.get(only);
+  if (!definition) {
+    console.log(`没有这个工具：${only}。已注册：${[...tools.keys()].join(', ')}`);
+    process.exit(1);
+  }
+  let params = {};
+  const raw = flag('--args');
+  if (raw) {
+    try {
+      params = JSON.parse(raw);
+    } catch (error) {
+      console.log(`--args 不是合法 JSON：${error.message}`);
+      process.exit(1);
+    }
+  }
+  console.log(await call(definition, params));
+  console.log('');
+  console.log(`（回放库留在 ${dshHome}，检查完可以整个删掉。）`);
+  process.exit(0);
+}
+
+console.log('');
+console.log('=== 自动审查（只提出候选，不写文件）===');
+const dry = await call(review, { action: 'dry-run' });
+console.log(String(dry));
+
+console.log('');
+console.log('=== 如果现在真的跑一次，会提出什么 ===');
+const real = await call(review, { action: 'run' });
+console.log(String(real).slice(0, 4000));
+
+console.log('');
+console.log('=== 队列 ===');
+console.log(String(await call(learn, { action: 'pending' })).slice(0, 4000));
+
+console.log('');
+console.log(`（回放库留在 ${dshHome}，检查完可以整个删掉。）`);

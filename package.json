@@ -1,1 +1,53 @@
-ewogICJuYW1lIjogImRzaC1sZWFybiIsCiAgInZlcnNpb24iOiAiMC4yLjEiLAogICJkZXNjcmlwdGlvbiI6ICJQZXJzaXN0ZW50IGxlYXJuaW5nIGZvciBEU0g6IHBvc3QtdHVybiByZXZpZXcgdHVybnMgYSBzZXNzaW9uJ3MgY29ycmVjdGlvbnMsIGZhaWx1cmVzIGFuZCBmaXhlcyBpbnRvIHJldXNhYmxlIHNraWxsczsgYW4gaWRsZSBjdXJhdG9yIGtlZXBzIHRoZSBsZWFybmVkIGxpYnJhcnkgaGVhbHRoeTsgZXZlcnkgbGVzc29uIGtlZXBzIGl0cyBwcm92ZW5hbmNlLiIsCiAgInR5cGUiOiAibW9kdWxlIiwKICAibWFpbiI6ICJsaWIvaW5kZXguanMiLAogICJleHBvcnRzIjogewogICAgIi4iOiAiLi9saWIvaW5kZXguanMiLAogICAgIi4vcGFja2FnZS5qc29uIjogIi4vcGFja2FnZS5qc29uIgogIH0sCiAgImVuZ2luZXMiOiB7CiAgICAibm9kZSI6ICI+PTIyLjE5IgogIH0sCiAgInJlcG9zaXRvcnkiOiB7CiAgICAidHlwZSI6ICJnaXQiLAogICAgInVybCI6ICJnaXQraHR0cHM6Ly9naXRodWIuY29tL3hpZXgxNjA3MC1qcGcvZHNoLWxlYXJuLmdpdCIKICB9LAogICJob21lcGFnZSI6ICJodHRwczovL2dpdGh1Yi5jb20veGlleDE2MDcwLWpwZy9kc2gtbGVhcm4jcmVhZG1lIiwKICAiYnVncyI6IHsKICAgICJ1cmwiOiAiaHR0cHM6Ly9naXRodWIuY29tL3hpZXgxNjA3MC1qcGcvZHNoLWxlYXJuL2lzc3VlcyIKICB9LAogICJkc2giOiB7CiAgICAiZW5naW5lcyI6IHsKICAgICAgImRzaCI6ICI+PTAuMi4wLXJjLjEiCiAgICB9LAogICAgImJ1bmRsZSI6IHsKICAgICAgInBhdGNoIjogIi4vY29yZGlzLnBhdGNoLnltbCIKICAgIH0KICB9LAogICJmaWxlcyI6IFsKICAgICJsaWIiLAogICAgInNjcmlwdHMvc2VsZnRlc3QubWpzIiwKICAgICJzY3JpcHRzL3JlcGxheS1zZXNzaW9uLm1qcyIsCiAgICAic2NyaXB0cy9wdXJnZS1ub2lzZS5tanMiLAogICAgImRvY3Mvc2hvdHMiLAogICAgImNvcmRpcy5wYXRjaC55bWwiLAogICAgInNjcmVlbnNob3RzLmpzb24iLAogICAgIlJFQURNRS5tZCIsCiAgICAiTElDRU5TRSIKICBdLAogICJzY3JpcHRzIjogewogICAgInRlc3QiOiAibm9kZSBzY3JpcHRzL3NlbGZ0ZXN0Lm1qcyIKICB9LAogICJrZXl3b3JkcyI6IFsKICAgICJkc2giLAogICAgImRzaC1wbHVnaW4iLAogICAgInNraWxscyIsCiAgICAibWVtb3J5IiwKICAgICJsZWFybmluZyIsCiAgICAiY29yZGlzIgogIF0sCiAgImxpY2Vuc2UiOiAiTUlUIgp9Cg==
+{
+  "name": "dsh-learn",
+  "version": "0.2.1",
+  "description": "Persistent learning for DSH: post-turn review turns a session's corrections, failures and fixes into reusable skills; an idle curator keeps the learned library healthy; every lesson keeps its provenance.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiex16070-jpg/dsh-learn.git"
+  },
+  "homepage": "https://github.com/xiex16070-jpg/dsh-learn#readme",
+  "bugs": {
+    "url": "https://github.com/xiex16070-jpg/dsh-learn/issues"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib",
+    "scripts/selftest.mjs",
+    "scripts/replay-session.mjs",
+    "scripts/purge-noise.mjs",
+    "docs/shots",
+    "cordis.patch.yml",
+    "screenshots.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node scripts/selftest.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "skills",
+    "memory",
+    "learning",
+    "cordis"
+  ],
+  "license": "MIT"
+}

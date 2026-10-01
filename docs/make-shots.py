@@ -1,1 +1,316 @@
-IyEvdXNyL2Jpbi9lbnYgcHl0aG9uCiMgLSotIGNvZGluZzogdXRmLTggLSotCiIiIgpSZW5kZXIgdGhlIHNob3djYXNlIGltYWdlcyBmb3IgZHNoLWxlYXJuJ3MgUkVBRE1FLgoKRXZlcnl0aGluZyBpdCBkcmF3cyBjb21lcyBmcm9tIG91dHB1dCB0aGF0IHdhcyBhY3R1YWxseSBjYXB0dXJlZCBmcm9tIHRoZSBwbHVnaW4KKHNlZSBgZG9jcy9zaG90cy8qLnR4dGApOyBub3RoaW5nIGhlcmUgaXMgYW4gaW52ZW50ZWQgc2NyZWVuc2hvdC4gVGhlIGltYWdlcyBhcmUKcGxhaW4gUE5HcyBzbyB0aGV5IHJlbmRlciBvbiBHaXRIdWIsIG5wbSBhbmQgYW55IE1hcmtkb3duIHZpZXdlci4KCiAgICBweXRob24gZG9jcy9tYWtlLXNob3RzLnB5CiIiIgoKaW1wb3J0IG9zCmltcG9ydCByZQppbXBvcnQgc3lzCgpmcm9tIFBJTCBpbXBvcnQgSW1hZ2UsIEltYWdlRHJhdywgSW1hZ2VGb250CgpIRVJFID0gb3MucGF0aC5kaXJuYW1lKG9zLnBhdGguYWJzcGF0aChfX2ZpbGVfXykpClNIT1RTID0gb3MucGF0aC5qb2luKEhFUkUsICJzaG90cyIpCgojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0gcGFsZXR0ZQpCRyA9ICIjMGQxMTE3IgpCQVIgPSAiIzE2MWIyMiIKQk9SREVSID0gIiMzMDM2M2QiCkZHID0gIiNlNmVkZjMiCkRJTSA9ICIjOGI5NDllIgpHUkVFTiA9ICIjM2ZiOTUwIgpSRUQgPSAiI2Y4NTE0OSIKWUVMTE9XID0gIiNkMjk5MjIiCkJMVUUgPSAiIzc5YzBmZiIKUFVSUExFID0gIiNkMmE4ZmYiCk9SQU5HRSA9ICIjZmZhNjU3IgpURUFMID0gIiM1NmQ0ZGQiCgpMQVRJTiA9ICJDOi9XaW5kb3dzL0ZvbnRzL2NvbnNvbGEudHRmIgpMQVRJTl9CID0gIkM6L1dpbmRvd3MvRm9udHMvY29uc29sYWIudHRmIgpDSksgPSAiQzovV2luZG93cy9Gb250cy9tc3loLnR0YyIKQ0pLX0IgPSAiQzovV2luZG93cy9Gb250cy9tc3loYmQudHRjIgoKQ0pLX1JFID0gcmUuY29tcGlsZSgKICAgIHIiW1x1MTEwMC1cdTExNWZcdTJlODAtXHVhNGNmXHVhOTYwLVx1YTk3Zlx1YWMwMC1cdWQ3ZmZcdWY5MDAtXHVmYWZmIgogICAgciJcdWZlMTAtXHVmZTE5XHVmZTMwLVx1ZmU2Zlx1ZmYwMC1cdWZmNjBcdWZmZTAtXHVmZmU2XHUzMDAwLVx1MzAzZl0iCikKCl9jYWNoZSA9IHt9CgoKZGVmIGZvbnQocGF0aCwgc2l6ZSwgYm9sZD1GYWxzZSk6CiAgICBrZXkgPSAocGF0aCwgc2l6ZSwgYm9sZCkKICAgIGlmIGtleSBub3QgaW4gX2NhY2hlOgogICAgICAgIF9jYWNoZVtrZXldID0gSW1hZ2VGb250LnRydWV0eXBlKHBhdGgsIHNpemUpCiAgICByZXR1cm4gX2NhY2hlW2tleV0KCgpkZWYgcnVucyh0ZXh0KToKICAgICIiIlNwbGl0IGEgbGluZSBpbnRvIChjaHVuaywgaXNfY2prKSBydW5zIHNvIG9uZSBmb250IG5ldmVyIGhhcyB0byBjb3ZlciBib3RoLiIiIgogICAgb3V0ID0gW10KICAgIGZvciBjaCBpbiB0ZXh0OgogICAgICAgIGNqayA9IGJvb2woQ0pLX1JFLm1hdGNoKGNoKSkKICAgICAgICBpZiBvdXQgYW5kIG91dFstMV1bMV0gPT0gY2prOgogICAgICAgICAgICBvdXRbLTFdWzBdICs9IGNoCiAgICAgICAgZWxzZToKICAgICAgICAgICAgb3V0LmFwcGVuZChbY2gsIGNqa10pCiAgICByZXR1cm4gb3V0CgoKZGVmIGRyYXdfcnVucyhkcmF3LCB4LCB5LCB0ZXh0LCBzaXplLCBjb2xvciwgYm9sZD1GYWxzZSk6CiAgICBmb3IgY2h1bmssIGNqayBpbiBydW5zKHRleHQpOgogICAgICAgIGYgPSBmb250KENKS19CIGlmIGNqayBhbmQgYm9sZCBlbHNlIENKSyBpZiBjamsgZWxzZSBMQVRJTl9CIGlmIGJvbGQgZWxzZSBMQVRJTiwgc2l6ZSkKICAgICAgICBkcmF3LnRleHQoKHgsIHkpLCBjaHVuaywgZm9udD1mLCBmaWxsPWNvbG9yKQogICAgICAgIHggKz0gZHJhdy50ZXh0bGVuZ3RoKGNodW5rLCBmb250PWYpCiAgICByZXR1cm4geAoKCmRlZiB0ZXh0X3dpZHRoKGRyYXcsIHRleHQsIHNpemUsIGJvbGQ9RmFsc2UpOgogICAgdG90YWwgPSAwCiAgICBmb3IgY2h1bmssIGNqayBpbiBydW5zKHRleHQpOgogICAgICAgIGYgPSBmb250KENKS19CIGlmIGNqayBhbmQgYm9sZCBlbHNlIENKSyBpZiBjamsgZWxzZSBMQVRJTl9CIGlmIGJvbGQgZWxzZSBMQVRJTiwgc2l6ZSkKICAgICAgICB0b3RhbCArPSBkcmF3LnRleHRsZW5ndGgoY2h1bmssIGZvbnQ9ZikKICAgIHJldHVybiB0b3RhbAoKCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLSBjb2xvdXJpbmcKUFJPTVBUID0gcmUuY29tcGlsZShyIl4oXCR8PnxQUyApIikKUEFUSCA9IHJlLmNvbXBpbGUociIoW0EtWmEtel06XFxcXD9bXlxzXCIn77yI77yJfF0rfH5bL1xcXVteXHNcIifvvIjvvIl8XSspIikKR09PRCA9IHJlLmNvbXBpbGUociIo4pyUfGFsbCBncmVlbnxjaGVja3MgcGFzc2VkfOKAlCBhbGwgZ3JlZW585oiQ5YqffOW3suWGmeWFpXzlj6/lhpnlhaV8XGJva1xiKSIpCkJBRCA9IHJlLmNvbXBpbGUociIoRkFJTHzlpLHotKV85ouS57udfOS4ouW8g3zplJnor698VHlwZUVycm9yfEVycm9yOnxSYW5nZUVycm9yKSIpCgoKZGVmIGNvbG91cl9mb3Ioc2VnbWVudCk6CiAgICBpZiBQUk9NUFQubWF0Y2goc2VnbWVudCk6CiAgICAgICAgcmV0dXJuIFRFQUwKICAgIGlmIEJBRC5zZWFyY2goc2VnbWVudCk6CiAgICAgICAgcmV0dXJuIFJFRAogICAgaWYgR09PRC5zZWFyY2goc2VnbWVudCk6CiAgICAgICAgcmV0dXJuIEdSRUVOCiAgICBpZiBQQVRILnNlYXJjaChzZWdtZW50KToKICAgICAgICByZXR1cm4gQkxVRQogICAgcmV0dXJuIEZHCgoKZGVmIHBhaW50KGRyYXcsIHgsIHksIGxpbmUsIHNpemUpOgogICAgIiIiQ29sb3VyIGEgY2FwdHVyZWQgdGVybWluYWwgbGluZTogcHJvbXB0IGN5YW4sIGZhaWx1cmVzIHJlZCwgcGFzc2VzIGdyZWVuLiIiIgogICAgIyBTcGxpdCBzbyB0aGF0IG1hcmtlcnMgY2FuIGJlIGNvbG91cmVkIGV2ZW4gaW5zaWRlIGFuIG90aGVyd2lzZSBwbGFpbiBsaW5lLgogICAgcGFydHMgPSByZS5zcGxpdChyIihcW2V4aXQgY29kZTogXGQrXF18RkFJTFteXG5dKnzinJRbXlxuXSp84oCUfMK3fFx8fO+8mikiLCBsaW5lKQogICAgZm9yIHBhcnQgaW4gcGFydHM6CiAgICAgICAgaWYgbm90IHBhcnQ6CiAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgeCA9IGRyYXdfcnVucyhkcmF3LCB4LCB5LCBwYXJ0LCBzaXplLCBjb2xvdXJfZm9yKHBhcnQpKQogICAgcmV0dXJuIHgKCgojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0gY2hyb21lCmRlZiB3aW5kb3cobGluZXMsIHNpemU9MTcsIGxlYWQ9MjcsIHdpZHRoPU5vbmUsIHRpdGxlPSIiLCBwYWQ9MjYsIG1pbl9oPTApOgogICAgIiIiQSB0ZXJtaW5hbCBjYXJkLiBgbGluZXNgIGFyZSAodGV4dCwgc3R5bGUtb3ZlcnJpZGUpIG9yIHBsYWluIHN0cmluZ3MuIiIiCiAgICBwcm9iZSA9IEltYWdlLm5ldygiUkdCIiwgKDEwLCAxMCkpCiAgICBwZCA9IEltYWdlRHJhdy5EcmF3KHByb2JlKQoKICAgICMgV3JhcCBmaXJzdCwgc28gYSBsb25nIHBhdGggY2Fubm90IHJ1biBvZmYgdGhlIGNhcmQuIENvbnRpbnVhdGlvbiBsaW5lcyBhcmUKICAgICMgaW5kZW50ZWQgdW5kZXIgdGhlaXIgZmlyc3QgbGluZSB0aGUgd2F5IGEgdGVybWluYWwgd3JhcHMgYSBwYXJhZ3JhcGguCiAgICBsaW1pdCA9ICh3aWR0aCAtIHBhZCAqIDIpIGlmIHdpZHRoIGVsc2UgTm9uZQogICAgd3JhcHBlZCA9IFtdCiAgICBmb3IgZW50cnkgaW4gbGluZXM6CiAgICAgICAgdGV4dCwgc3R5bGUgPSAoZW50cnksIE5vbmUpIGlmIGlzaW5zdGFuY2UoZW50cnksIHN0cikgZWxzZSBlbnRyeQogICAgICAgIGlmIHN0eWxlIG9yIGxpbWl0IGlzIE5vbmUgb3IgdGV4dF93aWR0aChwZCwgdGV4dCwgc2l6ZSkgPD0gbGltaXQ6CiAgICAgICAgICAgIHdyYXBwZWQuYXBwZW5kKCh0ZXh0LCBzdHlsZSkpCiAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgaW5kZW50ID0gIiAiICogMgogICAgICAgIGN1cnJlbnQgPSAiIgogICAgICAgIGZvciB3b3JkIGluIHJlLnNwbGl0KHIiKD88PSApIiwgdGV4dCk6CiAgICAgICAgICAgIHRyaWFsID0gY3VycmVudCArIHdvcmQKICAgICAgICAgICAgaWYgY3VycmVudCBhbmQgdGV4dF93aWR0aChwZCwgaW5kZW50ICsgdHJpYWwsIHNpemUpID4gbGltaXQ6CiAgICAgICAgICAgICAgICB3cmFwcGVkLmFwcGVuZCgoaW5kZW50ICsgY3VycmVudC5yc3RyaXAoKSwgTm9uZSkpCiAgICAgICAgICAgICAgICBjdXJyZW50ID0gd29yZAogICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgY3VycmVudCA9IHRyaWFsCiAgICAgICAgaWYgY3VycmVudC5zdHJpcCgpOgogICAgICAgICAgICB3cmFwcGVkLmFwcGVuZCgoaW5kZW50ICsgY3VycmVudC5yc3RyaXAoKSwgTm9uZSkpCiAgICBsaW5lcyA9IHdyYXBwZWQKCiAgICBib2R5X3cgPSBtYXgoW3RleHRfd2lkdGgocGQsIHQsIHNpemUpIGZvciB0LCBfIGluIFsoZSwgTm9uZSkgaWYgaXNpbnN0YW5jZShlLCBzdHIpIGVsc2UgZSBmb3IgZSBpbiBsaW5lc11dICsgWzEwXSkKICAgIHcgPSB3aWR0aCBvciBpbnQoYm9keV93ICsgcGFkICogMikKICAgIGJhcl9oID0gNDIKICAgIGggPSBpbnQoYmFyX2ggKyBwYWQgKyBsZW4obGluZXMpICogbGVhZCArIHBhZCkKICAgIGggPSBtYXgoaCwgbWluX2gpCgogICAgaW1nID0gSW1hZ2UubmV3KCJSR0IiLCAodywgaCksIEJHKQogICAgZCA9IEltYWdlRHJhdy5EcmF3KGltZykKCiAgICBkLnJvdW5kZWRfcmVjdGFuZ2xlKFswLCAwLCB3IC0gMSwgaCAtIDFdLCByYWRpdXM9MTIsIGZpbGw9QkcsIG91dGxpbmU9Qk9SREVSLCB3aWR0aD0xKQogICAgZC5yb3VuZGVkX3JlY3RhbmdsZShbMCwgMCwgdyAtIDEsIGJhcl9oXSwgcmFkaXVzPTEyLCBmaWxsPUJBUikKICAgIGQucmVjdGFuZ2xlKFswLCBiYXJfaCAtIDEyLCB3IC0gMSwgYmFyX2hdLCBmaWxsPUJBUikKICAgIGZvciBpLCBjIGluIGVudW1lcmF0ZSgoIiNmZjVmNTciLCAiI2ZlYmMyZSIsICIjMjhjODQwIikpOgogICAgICAgIGN4ID0gMjAgKyBpICogMjAKICAgICAgICBkLmVsbGlwc2UoW2N4IC0gNiwgYmFyX2ggLy8gMiAtIDYsIGN4ICsgNiwgYmFyX2ggLy8gMiArIDZdLCBmaWxsPWMpCiAgICBpZiB0aXRsZToKICAgICAgICB0dyA9IHRleHRfd2lkdGgoZCwgdGl0bGUsIDEzKQogICAgICAgIGRyYXdfcnVucyhkLCAodyAtIHR3KSAvIDIsIGJhcl9oIC8gMiAtIDksIHRpdGxlLCAxMywgRElNKQoKICAgIHkgPSBiYXJfaCArIHBhZCAtIDYKICAgIGZvciBlbnRyeSBpbiBsaW5lczoKICAgICAgICB0ZXh0LCBzdHlsZSA9IChlbnRyeSwgTm9uZSkgaWYgaXNpbnN0YW5jZShlbnRyeSwgc3RyKSBlbHNlIGVudHJ5CiAgICAgICAgaWYgc3R5bGUgPT0gImJsYW5rIjoKICAgICAgICAgICAgeSArPSBsZWFkCiAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgeCA9IHBhZAogICAgICAgIGlmIHN0eWxlID09ICJjbWQiOgogICAgICAgICAgICB4ID0gZHJhd19ydW5zKGQsIHgsIHksICIkICIsIHNpemUsIEdSRUVOLCBib2xkPVRydWUpCiAgICAgICAgICAgIHggPSBkcmF3X3J1bnMoZCwgeCwgeSwgdGV4dCwgc2l6ZSwgRkcpCiAgICAgICAgZWxpZiBzdHlsZToKICAgICAgICAgICAgZHJhd19ydW5zKGQsIHgsIHksIHRleHQsIHNpemUsIHN0eWxlKQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIHBhaW50KGQsIHgsIHksIHRleHQsIHNpemUpCiAgICAgICAgeSArPSBsZWFkCiAgICByZXR1cm4gaW1nCgoKZGVmIHNhdmUoaW1nLCBuYW1lKToKICAgIHBhdGggPSBvcy5wYXRoLmpvaW4oU0hPVFMsIG5hbWUpCiAgICBpbWcuc2F2ZShwYXRoKQogICAgcHJpbnQoIndyb3RlICVzICAlZHglZCIgJSAocGF0aCwgaW1nLndpZHRoLCBpbWcuaGVpZ2h0KSkKICAgIHJldHVybiBwYXRoCgoKZGVmIHJlYWQobmFtZSwga2VlcD1Ob25lKToKICAgIHdpdGggb3Blbihvcy5wYXRoLmpvaW4oU0hPVFMsIG5hbWUpLCBlbmNvZGluZz0idXRmLTgiKSBhcyBmaDoKICAgICAgICBsaW5lcyA9IGZoLnJlYWQoKS5yZXBsYWNlKCJcciIsICIiKS5zcGxpdCgiXG4iKQogICAgd2hpbGUgbGluZXMgYW5kIG5vdCBsaW5lc1stMV0uc3RyaXAoKToKICAgICAgICBsaW5lcy5wb3AoKQogICAgcmV0dXJuIGxpbmVzWzprZWVwXSBpZiBrZWVwIGVsc2UgbGluZXMKCgojIFRoZSBjYXB0dXJlZCBvdXRwdXQgY2FycmllcyBhYnNvbHV0ZSBwYXRocyB0aGF0IHdvdWxkIHJ1biBvZmYgdGhlIGNhcmQ7IHRoZQojIGltYWdlIHNob3VsZCByZWFkIGxpa2UgYSB0ZXJtaW5hbCwgbm90IGxpa2UgYSB3YWxsIG9mIG1hY2hpbmUtc3BlY2lmaWMgbm9pc2UuClNVQlMgPSBbCiAgICAjIFRoZSBwbHVnaW4ncyBvd24gZGlyZWN0b3J5IGlzIHdoYXRldmVyIHRoaXMgZmlsZSBzaXRzIGluLCB0d28gbGV2ZWxzIHVwIOKAlAogICAgIyBuZXZlciBoYXJkLWNvZGUgdGhlIHBhdGggb2YgdGhlIG1hY2hpbmUgdGhhdCBoYXBwZW5lZCB0byByZW5kZXIgdGhlIHNob3RzLgogICAgKG9zLnBhdGguZGlybmFtZShIRVJFKSwgIuKApiIpLAogICAgKG9zLmVudmlyb24uZ2V0KCJURU1QIiwgIiVURU1QJSIpICsgIlxcbGVhcm4tc2hvdHMiLCAiJVRFTVAlXFxsZWFybi1zaG90cyIpLAogICAgKG9zLmVudmlyb24uZ2V0KCJURU1QIiwgIiVURU1QJSIpLCAiJVRFTVAlIiksCiAgICAob3MucGF0aC5qb2luKG9zLnBhdGguZXhwYW5kdXNlcigifiIpLCAiLmRzaCIpLCAiPERTSF9IT01FPiIpLAogICAgKCLigKZcXGxpYlxcIiwgImxpYlxcIiksCiAgICAoIuKAplxcc2NyaXB0c1xcIiwgInNjcmlwdHNcXCIpLApdCgoKZGVmIHByZXR0eShsaW5lKToKICAgIGZvciBvbGQsIG5ldyBpbiBTVUJTOgogICAgICAgIGxpbmUgPSBsaW5lLnJlcGxhY2Uob2xkLCBuZXcpCiAgICByZXR1cm4gbGluZQoKCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLSBzaG90cwpkZWYgc2hvdF9jb3ZlcigpOgogICAgdywgaCA9IDEyODAsIDQ3MAogICAgaW1nID0gSW1hZ2UubmV3KCJSR0IiLCAodywgaCksIEJHKQogICAgZCA9IEltYWdlRHJhdy5EcmF3KGltZykKICAgIGQucm91bmRlZF9yZWN0YW5nbGUoWzAsIDAsIHcgLSAxLCBoIC0gMV0sIHJhZGl1cz0xNiwgZmlsbD1CRywgb3V0bGluZT1CT1JERVIsIHdpZHRoPTEpCgogICAgIyBzb2Z0IGFjY2VudCBiYXIKICAgIGQucm91bmRlZF9yZWN0YW5nbGUoWzAsIDAsIHcgLSAxLCA1XSwgcmFkaXVzPTMsIGZpbGw9R1JFRU4pCgogICAgZHJhd19ydW5zKGQsIDY0LCA1OCwgImRzaC1sZWFybiIsIDUyLCBGRywgYm9sZD1UcnVlKQogICAgZHJhd19ydW5zKGQsIDY0LCAxMjgsICJEU0gg55qE5oyB5LmF5a2m5Lmg5Zue6LevIiwgMjYsIERJTSkKCiAgICBkcmF3X3J1bnMoZCwgNjQsIDE4MiwgIui2iueUqOi2iuiBquaYjueahOmCo+S4qiBhZ2VudO+8jOmdoOeahOS4jeaYr+abtOWkp+eahOaooeWei++8jOaYr+Wug+aKiui4qei/h+eahOWdkeeVmeS6huS4i+adpeOAgiIsIDE4LCBGRykKCiAgICBzdGVwcyA9IFsKICAgICAgICAoIuWbnuWQiOe7k+adnyIsICLlj6ror7sgc2Vzc2lvbi9ldmVudFxu6Zu26aKd5aSW5qih5Z6L6LCD55SoIiksCiAgICAgICAgKCLoh6rliqjlrqHmn6UiLCAi5q2j5YiZ5Y+q6LSf6LSjXG7miorlgJnpgInmjJHlh7rmnaUiKSwKICAgICAgICAoIuS9oOivtOS6hueulyIsICLnoa7orqTmiY3okL3nm5hcbuavj+adoemDveW4puWHuuWkhCIpLAogICAgICAgICgi5LiL5qyh55Sf5pWIIiwgIuWwseaYr+aZrumAmuaKgOiDvVxuL+WQjeWtlyDljbPlj6/liqDovb0iKSwKICAgIF0KICAgIGJveF93LCBnYXAsIHRvcCA9IDI3MiwgMjYsIDI0MAogICAgZm9yIGksIChoZWFkLCBzdWIpIGluIGVudW1lcmF0ZShzdGVwcyk6CiAgICAgICAgeCA9IDY0ICsgaSAqIChib3hfdyArIGdhcCkKICAgICAgICBkLnJvdW5kZWRfcmVjdGFuZ2xlKFt4LCB0b3AsIHggKyBib3hfdywgdG9wICsgMTUwXSwgcmFkaXVzPTEwLCBmaWxsPUJBUiwgb3V0bGluZT1CT1JERVIsIHdpZHRoPTEpCiAgICAgICAgZHJhd19ydW5zKGQsIHggKyAyMiwgdG9wICsgMjAsIGhlYWQsIDIxLCBHUkVFTiwgYm9sZD1UcnVlKQogICAgICAgIGZvciBqLCBsaW5lIGluIGVudW1lcmF0ZShzdWIuc3BsaXQoIlxuIikpOgogICAgICAgICAgICBkcmF3X3J1bnMoZCwgeCArIDIyLCB0b3AgKyA2MiArIGogKiAyNCwgbGluZSwgMTUsIERJTSkKICAgICAgICBpZiBpIDwgbGVuKHN0ZXBzKSAtIDE6CiAgICAgICAgICAgIGRyYXdfcnVucyhkLCB4ICsgYm94X3cgKyA2LCB0b3AgKyA2MCwgIuKGkiIsIDIyLCBCT1JERVIpCgogICAgZHJhd19ydW5zKGQsIDY0LCA0MjQsICLmsLjkuI3ms6jlhaXmj5DnpLror40gwrcg5rC45LiN5pS55YaZ5Y6G5Y+yIMK3IOW9kuaho+S7juS4jeWIoOmZpCDCtyDkuI3mmK/oh6rlt7HliJvlu7rnmoTlsLHmsLjov5zkuI3norAiLCAxNSwgRElNKQogICAgcmV0dXJuIHNhdmUoaW1nLCAiMDEtY292ZXIucG5nIikKCgpkZWYgc2hvdF9zZWxmdGVzdCgpOgogICAgbGluZXMgPSBbXQogICAgZm9yIGxpbmUgaW4gcmVhZCgiMDMtc2VsZnRlc3QudHh0Iik6CiAgICAgICAgbGluZSA9IHByZXR0eShsaW5lKQogICAgICAgIGlmIGxpbmUuc3RhcnRzd2l0aCgoIkZBSUwiLCAiICAiKSkgYW5kICJjaGVja3MgcGFzc2VkIiBub3QgaW4gbGluZToKICAgICAgICAgICAgY29udGludWUKICAgICAgICBsaW5lcy5hcHBlbmQobGluZSkKICAgIGxpbmVzID0gW2wgZm9yIGwgaW4gbGluZXMgaWYgbC5zdHJpcCgpXVstMTQ6XQogICAgbGluZXMgPSBbKCJucG0gdGVzdCIsICJjbWQiKSwgKCIiLCAiYmxhbmsiKV0gKyBsaW5lcwogICAgcmV0dXJuIHNhdmUod2luZG93KGxpbmVzLCB3aWR0aD05ODAsIHRpdGxlPSJzY3JpcHRzL3NlbGZ0ZXN0Lm1qcyDigJQgMTUg6IqC77yM6Zu25L6d6LWWIiksICIwMi1zZWxmdGVzdC5wbmciKQoKCmRlZiBzaG90X3JlcGxheSgpOgogICAgcmF3ID0gcmVhZCgiMDEtcmVwbGF5LnR4dCIpCiAgICBrZWVwID0gW10KICAgIHN0YXJ0ZWQgPSBGYWxzZQogICAgZm9yIGxpbmUgaW4gcmF3OgogICAgICAgIGlmIGxpbmUuc3RhcnRzd2l0aCgiPT09IOmYn+WIlyIpOgogICAgICAgICAgICBzdGFydGVkID0gVHJ1ZQogICAgICAgIGlmIHN0YXJ0ZWQ6CiAgICAgICAgICAgIGtlZXAuYXBwZW5kKHByZXR0eShsaW5lKSkKICAgIGtlZXAgPSBbbCBmb3IgbCBpbiBrZWVwIGlmIGwuc3RyaXAoKV1bOjExXQogICAga2VlcCA9IFsKICAgICAgICAoIm5vZGUgc2NyaXB0cy9yZXBsYXktc2Vzc2lvbi5tanMgLS1sYXRlc3QgMSIsICJjbWQiKSwKICAgICAgICAi5oqK55yf5a6e5Lya6K+d77yINjQ0MCDkuKrkuovku7bvvInlloLlm57mj5Lku7bvvIznnIvlroPkvJrmj5Dlh7rku4DkuYjvvJoiLAogICAgICAgICgiIiwgImJsYW5rIiksCiAgICBdICsga2VlcAogICAgcmV0dXJuIHNhdmUod2luZG93KGtlZXAsIHdpZHRoPTExMjAsIHRpdGxlPSLnnJ/lrp7kvJror53lm57mlL4iKSwgIjAzLXJlcGxheS5wbmciKQoKCmRlZiBzaG90X3BlbmRpbmcoKToKICAgIHJhdyA9IHJlYWQoIjA0LXBlbmRpbmcudHh0IikKICAgIGtlZXAgPSBbcHJldHR5KGwpIGZvciBsIGluIHJhd1s1Ol0gaWYgbC5zdHJpcCgpIGFuZCBub3QgbC5zdGFydHN3aXRoKCLvvIjlm57mlL7lupMiKV0KICAgIGJvZHkgPSBbKCJsZWFybiBhY3Rpb249cGVuZGluZyIsICJjbWQiKSwgKCIiLCAiYmxhbmsiKV0gKyBrZWVwCiAgICByZXR1cm4gc2F2ZSh3aW5kb3coYm9keSwgd2lkdGg9MTE2MCwgdGl0bGU9IuWAmemAiemYn+WIl++8muWPquaciei/h+S6humXqOanm+eahOaJjeWHuueOsOWcqOi/memHjCIpLCAiMDQtcGVuZGluZy5wbmciKQoKCmRlZiBzaG90X2xheW91dCgpOgogICAgbGluZXMgPSBbCiAgICAgICAgKCI8RFNIX0hPTUU+LyIsIERJTSksCiAgICAgICAgKCLilJzilIDilIAgc2tpbGxzLyIsIEZHKSwKICAgICAgICAoIuKUgiAgIOKUnOKUgOKUgCBteS1vd24tc2tpbGwvICAgICAgICAgICDihpAg5L2g5omL5YaZ55qE77yM5o+S5Lu25rC45LiN6Kem56KwIiwgRElNKSwKICAgICAgICAoIuKUgiAgIOKUlOKUgOKUgCBsZWFybmVkLyAgICAgICAgICAgICAgICDihpAg5LiT5bGe5qC577yIY3VzdG9tU2tpbGxEaXJzIOeZu+iusO+8iSIsIEdSRUVOKSwKICAgICAgICAoIuKUgiAgICAgICDilJzilIDilIAgc2VsZi1sZWFybmluZy1sb29wL1NLSUxMLm1kIiwgRkcpLAogICAgICAgICgi4pSCICAgICAgIOKUnOKUgOKUgCBkdXJhYmxlLXByZWZlcmVuY2VzL1NLSUxMLm1kIiwgRkcpLAogICAgICAgICgi4pSCICAgICAgIOKUnOKUgOKUgCB0b29sLXJlY292ZXJ5L1NLSUxMLm1kIiwgRkcpLAogICAgICAgICgi4pSCICAgICAgIOKUlOKUgOKUgCBlbnZpcm9ubWVudC1mYWN0cy9TS0lMTC5tZCIsIEZHKSwKICAgICAgICAoIuKUlOKUgOKUgCBsZWFybi9kYXRhLyAgICAgICAgICAgICAgICAg4oaQIOWPsOi0puOAgemYn+WIl+OAgei0puacrOOAgeWbvuiwsSIsIEZHKSwKICAgICAgICAoIiAgICDilJzilIDilIAgbWFuYWdlZC5qc29uICAgICAgICAgICDlvZLlsZ7vvJrosIHmmK/mnKzmj5Lku7bliJvlu7rnmoQiLCBESU0pLAogICAgICAgICgiICAgIOKUnOKUgOKUgCB1c2FnZS5qc29uICAgICAgICAgICAgIOmBpea1i++8muiwgeecn+eahOiiq+WKoOi9vei/hyIsIERJTSksCiAgICAgICAgKCIgICAg4pSc4pSA4pSAIHBlbmRpbmcuanNvbiAgICAgICAgICAg5YCZ6YCJ77ya562J5L2g54K55aS0IiwgRElNKSwKICAgICAgICAoIiAgICDilJzilIDilIAgbGVkZ2VyLmpzb25sICAgICAgICAgICDotKbmnKzvvJrmr4/mrKHliqjkvZzpg73nlZnnl5UiLCBESU0pLAogICAgICAgICgiICAgIOKUlOKUgOKUgCBhcmNoaXZlLyAgICAgICAgICAgICAgIOW9kuaho++8muenu+WHuuWOu++8jOmaj+aXtuenu+WbnuadpSIsIERJTSksCiAgICBdCiAgICByZXR1cm4gc2F2ZSh3aW5kb3cobGluZXMsIHdpZHRoPTEwMDAsIHNpemU9MTYsIGxlYWQ9MjYsIHRpdGxlPSLno4Hnm5jluIPlsYAiKSwgIjA1LWxheW91dC5wbmciKQoKCmRlZiBtYWluKCk6CiAgICBvcy5tYWtlZGlycyhTSE9UUywgZXhpc3Rfb2s9VHJ1ZSkKICAgIHNob3RfY292ZXIoKQogICAgc2hvdF9zZWxmdGVzdCgpCiAgICBzaG90X3JlcGxheSgpCiAgICBzaG90X3BlbmRpbmcoKQogICAgc2hvdF9sYXlvdXQoKQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICBtYWluKCkK
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Render the showcase images for dsh-learn's README.
+
+Everything it draws comes from output that was actually captured from the plugin
+(see `docs/shots/*.txt`); nothing here is an invented screenshot. The images are
+plain PNGs so they render on GitHub, npm and any Markdown viewer.
+
+    python docs/make-shots.py
+"""
+
+import os
+import re
+import sys
+
+from PIL import Image, ImageDraw, ImageFont
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SHOTS = os.path.join(HERE, "shots")
+
+# ---------------------------------------------------------------- palette
+BG = "#0d1117"
+BAR = "#161b22"
+BORDER = "#30363d"
+FG = "#e6edf3"
+DIM = "#8b949e"
+GREEN = "#3fb950"
+RED = "#f85149"
+YELLOW = "#d29922"
+BLUE = "#79c0ff"
+PURPLE = "#d2a8ff"
+ORANGE = "#ffa657"
+TEAL = "#56d4dd"
+
+LATIN = "C:/Windows/Fonts/consola.ttf"
+LATIN_B = "C:/Windows/Fonts/consolab.ttf"
+CJK = "C:/Windows/Fonts/msyh.ttc"
+CJK_B = "C:/Windows/Fonts/msyhbd.ttc"
+
+CJK_RE = re.compile(
+    r"[\u1100-\u115f\u2e80-\ua4cf\ua960-\ua97f\uac00-\ud7ff\uf900-\ufaff"
+    r"\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u3000-\u303f]"
+)
+
+_cache = {}
+
+
+def font(path, size, bold=False):
+    key = (path, size, bold)
+    if key not in _cache:
+        _cache[key] = ImageFont.truetype(path, size)
+    return _cache[key]
+
+
+def runs(text):
+    """Split a line into (chunk, is_cjk) runs so one font never has to cover both."""
+    out = []
+    for ch in text:
+        cjk = bool(CJK_RE.match(ch))
+        if out and out[-1][1] == cjk:
+            out[-1][0] += ch
+        else:
+            out.append([ch, cjk])
+    return out
+
+
+def draw_runs(draw, x, y, text, size, color, bold=False):
+    for chunk, cjk in runs(text):
+        f = font(CJK_B if cjk and bold else CJK if cjk else LATIN_B if bold else LATIN, size)
+        draw.text((x, y), chunk, font=f, fill=color)
+        x += draw.textlength(chunk, font=f)
+    return x
+
+
+def text_width(draw, text, size, bold=False):
+    total = 0
+    for chunk, cjk in runs(text):
+        f = font(CJK_B if cjk and bold else CJK if cjk else LATIN_B if bold else LATIN, size)
+        total += draw.textlength(chunk, font=f)
+    return total
+
+
+# ---------------------------------------------------------------- colouring
+PROMPT = re.compile(r"^(\$|>|PS )")
+PATH = re.compile(r"([A-Za-z]:\\\\?[^\s\"'（）|]+|~[/\\][^\s\"'（）|]+)")
+GOOD = re.compile(r"(✔|all green|checks passed|— all green|成功|已写入|可写入|\bok\b)")
+BAD = re.compile(r"(FAIL|失败|拒绝|丢弃|错误|TypeError|Error:|RangeError)")
+
+
+def colour_for(segment):
+    if PROMPT.match(segment):
+        return TEAL
+    if BAD.search(segment):
+        return RED
+    if GOOD.search(segment):
+        return GREEN
+    if PATH.search(segment):
+        return BLUE
+    return FG
+
+
+def paint(draw, x, y, line, size):
+    """Colour a captured terminal line: prompt cyan, failures red, passes green."""
+    # Split so that markers can be coloured even inside an otherwise plain line.
+    parts = re.split(r"(\[exit code: \d+\]|FAIL[^\n]*|✔[^\n]*|—|·|\||：)", line)
+    for part in parts:
+        if not part:
+            continue
+        x = draw_runs(draw, x, y, part, size, colour_for(part))
+    return x
+
+
+# ---------------------------------------------------------------- chrome
+def window(lines, size=17, lead=27, width=None, title="", pad=26, min_h=0):
+    """A terminal card. `lines` are (text, style-override) or plain strings."""
+    probe = Image.new("RGB", (10, 10))
+    pd = ImageDraw.Draw(probe)
+
+    # Wrap first, so a long path cannot run off the card. Continuation lines are
+    # indented under their first line the way a terminal wraps a paragraph.
+    limit = (width - pad * 2) if width else None
+    wrapped = []
+    for entry in lines:
+        text, style = (entry, None) if isinstance(entry, str) else entry
+        if style or limit is None or text_width(pd, text, size) <= limit:
+            wrapped.append((text, style))
+            continue
+        indent = " " * 2
+        current = ""
+        for word in re.split(r"(?<= )", text):
+            trial = current + word
+            if current and text_width(pd, indent + trial, size) > limit:
+                wrapped.append((indent + current.rstrip(), None))
+                current = word
+            else:
+                current = trial
+        if current.strip():
+            wrapped.append((indent + current.rstrip(), None))
+    lines = wrapped
+
+    body_w = max([text_width(pd, t, size) for t, _ in [(e, None) if isinstance(e, str) else e for e in lines]] + [10])
+    w = width or int(body_w + pad * 2)
+    bar_h = 42
+    h = int(bar_h + pad + len(lines) * lead + pad)
+    h = max(h, min_h)
+
+    img = Image.new("RGB", (w, h), BG)
+    d = ImageDraw.Draw(img)
+
+    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=12, fill=BG, outline=BORDER, width=1)
+    d.rounded_rectangle([0, 0, w - 1, bar_h], radius=12, fill=BAR)
+    d.rectangle([0, bar_h - 12, w - 1, bar_h], fill=BAR)
+    for i, c in enumerate(("#ff5f57", "#febc2e", "#28c840")):
+        cx = 20 + i * 20
+        d.ellipse([cx - 6, bar_h // 2 - 6, cx + 6, bar_h // 2 + 6], fill=c)
+    if title:
+        tw = text_width(d, title, 13)
+        draw_runs(d, (w - tw) / 2, bar_h / 2 - 9, title, 13, DIM)
+
+    y = bar_h + pad - 6
+    for entry in lines:
+        text, style = (entry, None) if isinstance(entry, str) else entry
+        if style == "blank":
+            y += lead
+            continue
+        x = pad
+        if style == "cmd":
+            x = draw_runs(d, x, y, "$ ", size, GREEN, bold=True)
+            x = draw_runs(d, x, y, text, size, FG)
+        elif style:
+            draw_runs(d, x, y, text, size, style)
+        else:
+            paint(d, x, y, text, size)
+        y += lead
+    return img
+
+
+def save(img, name):
+    path = os.path.join(SHOTS, name)
+    img.save(path)
+    print("wrote %s  %dx%d" % (path, img.width, img.height))
+    return path
+
+
+def read(name, keep=None):
+    with open(os.path.join(SHOTS, name), encoding="utf-8") as fh:
+        lines = fh.read().replace("\r", "").split("\n")
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return lines[:keep] if keep else lines
+
+
+# The captured output carries absolute paths that would run off the card; the
+# image should read like a terminal, not like a wall of machine-specific noise.
+SUBS = [
+    # The plugin's own directory is whatever this file sits in, two levels up —
+    # never hard-code the path of the machine that happened to render the shots.
+    (os.path.dirname(HERE), "…"),
+    (os.environ.get("TEMP", "%TEMP%") + "\\learn-shots", "%TEMP%\\learn-shots"),
+    (os.environ.get("TEMP", "%TEMP%"), "%TEMP%"),
+    (os.path.join(os.path.expanduser("~"), ".dsh"), "<DSH_HOME>"),
+    ("…\\lib\\", "lib\\"),
+    ("…\\scripts\\", "scripts\\"),
+]
+
+
+def pretty(line):
+    for old, new in SUBS:
+        line = line.replace(old, new)
+    return line
+
+
+# ---------------------------------------------------------------- shots
+def shot_cover():
+    w, h = 1280, 470
+    img = Image.new("RGB", (w, h), BG)
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=16, fill=BG, outline=BORDER, width=1)
+
+    # soft accent bar
+    d.rounded_rectangle([0, 0, w - 1, 5], radius=3, fill=GREEN)
+
+    draw_runs(d, 64, 58, "dsh-learn", 52, FG, bold=True)
+    draw_runs(d, 64, 128, "DSH 的持久学习回路", 26, DIM)
+
+    draw_runs(d, 64, 182, "越用越聪明的那个 agent，靠的不是更大的模型，是它把踩过的坑留了下来。", 18, FG)
+
+    steps = [
+        ("回合结束", "只读 session/event\n零额外模型调用"),
+        ("自动审查", "正则只负责\n把候选挑出来"),
+        ("你说了算", "确认才落盘\n每条都带出处"),
+        ("下次生效", "就是普通技能\n/名字 即可加载"),
+    ]
+    box_w, gap, top = 272, 26, 240
+    for i, (head, sub) in enumerate(steps):
+        x = 64 + i * (box_w + gap)
+        d.rounded_rectangle([x, top, x + box_w, top + 150], radius=10, fill=BAR, outline=BORDER, width=1)
+        draw_runs(d, x + 22, top + 20, head, 21, GREEN, bold=True)
+        for j, line in enumerate(sub.split("\n")):
+            draw_runs(d, x + 22, top + 62 + j * 24, line, 15, DIM)
+        if i < len(steps) - 1:
+            draw_runs(d, x + box_w + 6, top + 60, "→", 22, BORDER)
+
+    draw_runs(d, 64, 424, "永不注入提示词 · 永不改写历史 · 归档从不删除 · 不是自己创建的就永远不碰", 15, DIM)
+    return save(img, "01-cover.png")
+
+
+def shot_selftest():
+    lines = []
+    for line in read("03-selftest.txt"):
+        line = pretty(line)
+        if line.startswith(("FAIL", "  ")) and "checks passed" not in line:
+            continue
+        lines.append(line)
+    lines = [l for l in lines if l.strip()][-14:]
+    lines = [("npm test", "cmd"), ("", "blank")] + lines
+    return save(window(lines, width=980, title="scripts/selftest.mjs — 15 节，零依赖"), "02-selftest.png")
+
+
+def shot_replay():
+    raw = read("01-replay.txt")
+    keep = []
+    started = False
+    for line in raw:
+        if line.startswith("=== 队列"):
+            started = True
+        if started:
+            keep.append(pretty(line))
+    keep = [l for l in keep if l.strip()][:11]
+    keep = [
+        ("node scripts/replay-session.mjs --latest 1", "cmd"),
+        "把真实会话（6440 个事件）喂回插件，看它会提出什么：",
+        ("", "blank"),
+    ] + keep
+    return save(window(keep, width=1120, title="真实会话回放"), "03-replay.png")
+
+
+def shot_pending():
+    raw = read("04-pending.txt")
+    keep = [pretty(l) for l in raw[5:] if l.strip() and not l.startswith("（回放库")]
+    body = [("learn action=pending", "cmd"), ("", "blank")] + keep
+    return save(window(body, width=1160, title="候选队列：只有过了门槛的才出现在这里"), "04-pending.png")
+
+
+def shot_layout():
+    lines = [
+        ("<DSH_HOME>/", DIM),
+        ("├── skills/", FG),
+        ("│   ├── my-own-skill/           ← 你手写的，插件永不触碰", DIM),
+        ("│   └── learned/                ← 专属根（customSkillDirs 登记）", GREEN),
+        ("│       ├── self-learning-loop/SKILL.md", FG),
+        ("│       ├── durable-preferences/SKILL.md", FG),
+        ("│       ├── tool-recovery/SKILL.md", FG),
+        ("│       └── environment-facts/SKILL.md", FG),
+        ("└── learn/data/                 ← 台账、队列、账本、图谱", FG),
+        ("    ├── managed.json           归属：谁是本插件创建的", DIM),
+        ("    ├── usage.json             遥测：谁真的被加载过", DIM),
+        ("    ├── pending.json           候选：等你点头", DIM),
+        ("    ├── ledger.jsonl           账本：每次动作都留痕", DIM),
+        ("    └── archive/               归档：移出去，随时移回来", DIM),
+    ]
+    return save(window(lines, width=1000, size=16, lead=26, title="磁盘布局"), "05-layout.png")
+
+
+def main():
+    os.makedirs(SHOTS, exist_ok=True)
+    shot_cover()
+    shot_selftest()
+    shot_replay()
+    shot_pending()
+    shot_layout()
+
+
+if __name__ == "__main__":
+    main()

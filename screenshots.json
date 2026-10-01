@@ -1,1 +1,9 @@
-ewogICJzY3JlZW5zaG90cyI6IFsKICAgICJkb2NzL3Nob3RzLzAxLWNvdmVyLnBuZyIsCiAgICAiZG9jcy9zaG90cy8wMy1yZXBsYXkucG5nIiwKICAgICJkb2NzL3Nob3RzLzA0LXBlbmRpbmcucG5nIiwKICAgICJkb2NzL3Nob3RzLzAyLXNlbGZ0ZXN0LnBuZyIsCiAgICAiZG9jcy9zaG90cy8wNS1sYXlvdXQucG5nIgogIF0KfQo=
+{
+  "screenshots": [
+    "docs/shots/01-cover.png",
+    "docs/shots/03-replay.png",
+    "docs/shots/04-pending.png",
+    "docs/shots/02-selftest.png",
+    "docs/shots/05-layout.png"
+  ]
+}

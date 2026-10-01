@@ -1,1 +1,140 @@
-IyEvdXNyL2Jpbi9lbnYgbm9kZQovKioKICogUmUtanVkZ2UgZXZlcnl0aGluZyBjdXJyZW50bHkgcXVldWVkIGluIHRoZSBsaXZlIGxpYnJhcnkgYW5kIGRyb3Agd2hhdCB0aGUKICogQ1VSUkVOVCBnYXRlcyB3b3VsZCByZWZ1c2UuCiAqCiAqIFdoeSB0aGlzIGV4aXN0czogd2hlbiB0aGUgZ2F0ZXMgZ2V0IHNoYXJwZXIsIHRoZSBydWxlcyBnZXQgYmV0dGVyIGJ1dCB0aGUKICogcXVldWUgZG9lcyBub3QuIEEgc2tpbGwgbGlicmFyeSB0aGF0IG9ubHkgZXZlciBncm93cyBpcyBhIGp1bmsgZHJhd2VyLCBhbmQgdGhlCiAqIGZpcnN0IGxpdmUgcnVuIGlzIHRoZSBwcm9vZiDigJQgbmluZSBwcm9wb3NhbHMgd2VyZSBzaXR0aW5nIGluIGBwZW5kaW5nLmpzb25gLAogKiBldmVyeSBvbmUgb2YgdGhlbSBhIHRyYW5zY3JpcHQgYXJ0aWZhY3QsIGFsbCBvZiB0aGVtIGNhcnJ5aW5nIGBvazogdHJ1ZWAKICogYmVjYXVzZSB0aGV5IHdlcmUgZmlsZWQgYnkgdGhlIG9sZGVyLCB3ZWFrZXIgZ2F0ZS4KICoKICogVGhlIHNjcmlwdCBkZWxpYmVyYXRlbHkgcmUtdXNlcyB0aGUgcGx1Z2luJ3Mgb3duIGByZXZpZXcuZ2F0ZXNGb3IoKWAuIEEgcHVyZ2UKICogdG9vbCB3aXRoIGl0cyBvd24gb3BpbmlvbiBhYm91dCBxdWFsaXR5IHdvdWxkIGRyaWZ0IGZyb20gdGhlIHBsdWdpbiBpdCBpcwogKiBjbGVhbmluZyB1cCBhZnRlci4KICoKICogVXNhZ2U6CiAqICAgbm9kZSBzY3JpcHRzL3B1cmdlLW5vaXNlLm1qcyAgICAgICAgICAgICAgICAgIyBkcnkgcnVuLCBwcmludHMgdGhlIHZlcmRpY3QKICogICBub2RlIHNjcmlwdHMvcHVyZ2Utbm9pc2UubWpzIC0tYXBwbHkgICAgICAgICAjIGFjdHVhbGx5IHJld3JpdGUKICogICBub2RlIHNjcmlwdHMvcHVyZ2Utbm9pc2UubWpzIC0tZHNoLWhvbWUgRElSICAjIHRhcmdldCBhIGRpZmZlcmVudCBsaWJyYXJ5CiAqLwppbXBvcnQgeyByZWFkRmlsZVN5bmMgfSBmcm9tICdub2RlOmZzJzsKaW1wb3J0IHsgam9pbiB9IGZyb20gJ25vZGU6cGF0aCc7CmltcG9ydCB7IGhvbWVkaXIgfSBmcm9tICdub2RlOm9zJzsKCmltcG9ydCB7IG5vcm1hbGl6ZUNvbmZpZyB9IGZyb20gJy4uL2xpYi9jb25maWcuanMnOwppbXBvcnQgeyBjcmVhdGVTdG9yZSB9IGZyb20gJy4uL2xpYi9zdG9yYWdlLmpzJzsKaW1wb3J0IHsgY3JlYXRlUmV2aWV3IH0gZnJvbSAnLi4vbGliL3Jldmlldy5qcyc7Cgpjb25zdCBhcmdzID0gcHJvY2Vzcy5hcmd2LnNsaWNlKDIpOwpjb25zdCBhcHBseSA9IGFyZ3MuaW5jbHVkZXMoJy0tYXBwbHknKTsKY29uc3QgZmxhZyA9IChuYW1lLCBmYWxsYmFjaykgPT4gewogIGNvbnN0IGhpdCA9IGFyZ3MuZmluZCgoZW50cnkpID0+IGVudHJ5ID09PSBuYW1lIHx8IGVudHJ5LnN0YXJ0c1dpdGgoYCR7bmFtZX09YCkpOwogIGlmICghaGl0KSByZXR1cm4gZmFsbGJhY2s7CiAgY29uc3QgZXEgPSBoaXQuaW5kZXhPZignPScpOwogIHJldHVybiBlcSA9PT0gLTEgPyB0cnVlIDogaGl0LnNsaWNlKGVxICsgMSk7Cn07Cgpjb25zdCBkc2hIb21lID0gU3RyaW5nKGZsYWcoJy0tZHNoLWhvbWUnLCBwcm9jZXNzLmVudi5EU0hfSE9NRSB8fCBqb2luKGhvbWVkaXIoKSwgJy5kc2gnKSkpOwpjb25zdCBjb25maWcgPSBub3JtYWxpemVDb25maWcoeyBkc2hIb21lIH0pOwpjb25zdCBzdG9yZSA9IGNyZWF0ZVN0b3JlKHsgcm9vdDogY29uZmlnLmRhdGFEaXIsIGRhdGFEaXI6IGNvbmZpZy5kYXRhRGlyIH0pOwoKLy8gLS0gMS4gcmUtanVkZ2UgdGhlIHBlbmRpbmcgcXVldWUgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCgpjb25zdCByYXcgPSBzdG9yZS5sb2FkUGVuZGluZygpOwpjb25zdCBpdGVtcyA9IEFycmF5LmlzQXJyYXkocmF3KSA/IHJhdyA6IChyYXcgJiYgcmF3Lml0ZW1zKSB8fCBbXTsKY29uc3Qgbm9pc3kgPSBbXTsKCmNvbnN0IHByb2JlID0gY3JlYXRlUmV2aWV3KHsKICBjb25maWcsCiAgc3RvcmUsCiAgc2tpbGxzOiB7IGxpc3Q6ICgpID0+IFtdLCByZWFkUnVsZXM6ICgpID0+IFtdLCByb290OiAnJywgbGVhcm5lZERpcjogJycgfSwKICBtYW5hZ2VkOiB7IGlzTWFuYWdlZDogKCkgPT4gZmFsc2UsIGlzUHJvdGVjdGVkOiAoKSA9PiBmYWxzZSwgbmFtZXM6ICgpID0+IFtdIH0sCiAgY3VyYXRvcjogeyB0b3VjaDogKCkgPT4ge30gfSwKICBsb2dnZXI6IGNvbnNvbGUsCiAgY2FwdHVyZTogbnVsbCwKfSk7Cgpjb25zb2xlLmxvZyhg5bqT77yaJHtjb25maWcuZGF0YURpcn1gKTsKY29uc29sZS5sb2coYOWAmemAieaVmeiure+8miR7aXRlbXMubGVuZ3RofSDmnaFgKTsKY29uc29sZS5sb2coJycpOwoKY29uc3Qga2VwdCA9IFtdOwpmb3IgKGNvbnN0IGl0ZW0gb2YgaXRlbXMpIHsKICBjb25zdCB2ZXJkaWN0ID0gcHJvYmUuZ2F0ZXNGb3IoewogICAgc3RhdGVtZW50OiBpdGVtLnN0YXRlbWVudCwKICAgIGtpbmQ6IGl0ZW0ua2luZCwKICAgIHNvdXJjZTogaXRlbS5zb3VyY2UsCiAgICByZXNvbHZlZDogaXRlbS5yZXNvbHZlZCwKICAgIHVtYnJlbGxhOiBpdGVtLnVtYnJlbGxhLAogIH0pOwogIGNvbnN0IHJlYXNvbnMgPSBwcm9iZS5nYXRlUmVhc29ucyh2ZXJkaWN0LmdhdGUsIHZlcmRpY3QuY2hlY2tzKTsKICBpZiAoIXZlcmRpY3QuZ2F0ZS5vaykgewogICAgbm9pc3kucHVzaCh7IGl0ZW0sIHJlYXNvbnMgfSk7CiAgICBjb25zb2xlLmxvZyhgICDkuKLlvIMgJHtpdGVtLmlkfSAgWyR7aXRlbS5raW5kfS8ke2l0ZW0uc291cmNlfV0gJHtyZWFzb25zfWApOwogIH0gZWxzZSB7CiAgICBrZXB0LnB1c2goaXRlbSk7CiAgfQp9Cgpjb25zb2xlLmxvZygnJyk7CmNvbnNvbGUubG9nKGDkv53nlZkgJHtrZXB0Lmxlbmd0aH0g5p2h77yM5Lii5byDICR7bm9pc3kubGVuZ3RofSDmnaFgKTsKZm9yIChjb25zdCBpdGVtIG9mIGtlcHQpIHsKICBjb25zb2xlLmxvZyhgICDCtyDkv53nlZkgJHtpdGVtLmlkfSAgWyR7aXRlbS5raW5kfS8ke2l0ZW0uc291cmNlfV0gJHtTdHJpbmcoaXRlbS5zdGF0ZW1lbnQpLnNsaWNlKDAsIDEwMCkucmVwbGFjZSgvXHMrL2csICcgJyl9YCk7Cn0KCi8vIC0tIDIuIGNvbXBhY3QgdGhlIGxlZGdlciAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQoKY29uc3QgbGVkZ2VyRmlsZSA9IHN0b3JlLmZpbGVzLmxlZGdlcjsKbGV0IGxlZGdlclJvd3MgPSBbXTsKdHJ5IHsKICBsZWRnZXJSb3dzID0gcmVhZEZpbGVTeW5jKGxlZGdlckZpbGUsICd1dGY4JykKICAgIC5zcGxpdCgnXG4nKQogICAgLmZpbHRlcigobGluZSkgPT4gbGluZS50cmltKCkpCiAgICAubWFwKChsaW5lKSA9PiBKU09OLnBhcnNlKGxpbmUpKTsKfSBjYXRjaCB7CiAgbGVkZ2VyUm93cyA9IFtdOwp9CgovLyBBIHJlZnVzYWwgdGhhdCByZXBlYXRzIGlzIG9uZSBkZWNpc2lvbiwgbm90IE4uIFRoZSBsaXZlIHJ1biB3cm90ZSAxMjQKLy8gaWRlbnRpY2FsIGByZXZpZXcucmVmdXNlYCByb3dzIGJlY2F1c2UgdGhlIHJldmlld2VyIHJlLWxpdGlnYXRlZCB0aGUgc2FtZQovLyBjYW5kaWRhdGUgZXZlcnkgdGljazsgdGhlIGxlZGdlciBpcyBhIGhpc3RvcnksIG5vdCBhIGNvdW50ZXIuCmNvbnN0IHNlZW4gPSBuZXcgTWFwKCk7CmNvbnN0IGNvbXBhY3RlZCA9IFtdOwpmb3IgKGNvbnN0IHJvdyBvZiBsZWRnZXJSb3dzKSB7CiAgY29uc3Qga2V5ID0gYCR7cm93LmFjdGlvbn18JHtyb3cuZnAgfHwgJyd9fCR7cm93LnJlYXNvbiB8fCAnJ318JHtyb3cuaWQgfHwgJyd9YDsKICBpZiAocm93LmFjdGlvbiA9PT0gJ3Jldmlldy5yZWZ1c2UnICYmIHNlZW4uaGFzKGtleSkpIHsKICAgIGNvbnN0IGZpcnN0ID0gc2Vlbi5nZXQoa2V5KTsKICAgIGZpcnN0LnJlcGVhdHMgPSAoZmlyc3QucmVwZWF0cyB8fCAxKSArIDE7CiAgICBmaXJzdC5sYXN0QXQgPSByb3cuYXQgfHwgZmlyc3QubGFzdEF0OwogICAgY29udGludWU7CiAgfQogIGNvbnN0IGNvcHkgPSB7IC4uLnJvdyB9OwogIHNlZW4uc2V0KGtleSwgY29weSk7CiAgY29tcGFjdGVkLnB1c2goY29weSk7Cn0KCmNvbnNvbGUubG9nKCcnKTsKY29uc29sZS5sb2coYOi0puacrO+8miR7bGVkZ2VyUm93cy5sZW5ndGh9IOihjCDihpIgJHtjb21wYWN0ZWQubGVuZ3RofSDooYzvvIjlkIjlubYgJHtsZWRnZXJSb3dzLmxlbmd0aCAtIGNvbXBhY3RlZC5sZW5ndGh9IOihjOmHjeWkjeeahOaLkuaUtuiusOW9le+8iWApOwoKLy8gLS0gMy4gYXBwbHkgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCgppZiAoIWFwcGx5KSB7CiAgY29uc29sZS5sb2coJycpOwogIGNvbnNvbGUubG9nKCfvvIhkcnkgcnVu77yM5pyq5YaZ5YWl5Lu75L2V5paH5Lu244CC5YqgIC0tYXBwbHkg5omN5Lya55Sf5pWI44CC77yJJyk7CiAgcHJvY2Vzcy5leGl0KDApOwp9CgppZiAobm9pc3kubGVuZ3RoKSB7CiAgLy8gc2F2ZVBlbmRpbmcgdGFrZXMgdGhlIEFSUkFZIGFuZCB3cml0ZXMgdGhlIGVudmVsb3BlIGl0c2VsZi4gSGFuZGluZyBpdCB0aGUKICAvLyBlbnZlbG9wZSBpbnN0ZWFkIHNpbGVudGx5IHF1ZXVlcyBub3RoaW5nIOKAlCB3aGljaCBpcyBob3cgdGhpcyBzY3JpcHQgd291bGQKICAvLyBoYXZlICJjbGVhbmVkIiBhIGxpYnJhcnkgYnkgdGhyb3dpbmcgYXdheSBldmVyeSBnb29kIHByb3Bvc2FsIHdpdGggaXQuCiAgc3RvcmUuc2F2ZVBlbmRpbmcoa2VwdCk7Cn0KaWYgKGNvbXBhY3RlZC5sZW5ndGggIT09IGxlZGdlclJvd3MubGVuZ3RoKSB7CiAgY29uc3QgdGV4dCA9IGNvbXBhY3RlZC5tYXAoKHJvdykgPT4gSlNPTi5zdHJpbmdpZnkocm93KSkuam9pbignXG4nKTsKICBzdG9yZS53cml0ZUF0b21pYyhsZWRnZXJGaWxlLCB0ZXh0ID8gYCR7dGV4dH1cbmAgOiAnJyk7Cn0KCmNvbnNvbGUubG9nKCcnKTsKY29uc29sZS5sb2coYOW3suWGmeWFpe+8muWAmemAiSAke2tlcHQubGVuZ3RofSDmnaHvvIzotKbmnKwgJHtjb21wYWN0ZWQubGVuZ3RofSDooYxgKTsK
+#!/usr/bin/env node
+/**
+ * Re-judge everything currently queued in the live library and drop what the
+ * CURRENT gates would refuse.
+ *
+ * Why this exists: when the gates get sharper, the rules get better but the
+ * queue does not. A skill library that only ever grows is a junk drawer, and the
+ * first live run is the proof — nine proposals were sitting in `pending.json`,
+ * every one of them a transcript artifact, all of them carrying `ok: true`
+ * because they were filed by the older, weaker gate.
+ *
+ * The script deliberately re-uses the plugin's own `review.gatesFor()`. A purge
+ * tool with its own opinion about quality would drift from the plugin it is
+ * cleaning up after.
+ *
+ * Usage:
+ *   node scripts/purge-noise.mjs                 # dry run, prints the verdict
+ *   node scripts/purge-noise.mjs --apply         # actually rewrite
+ *   node scripts/purge-noise.mjs --dsh-home DIR  # target a different library
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+
+import { normalizeConfig } from '../lib/config.js';
+import { createStore } from '../lib/storage.js';
+import { createReview } from '../lib/review.js';
+
+const args = process.argv.slice(2);
+const apply = args.includes('--apply');
+const flag = (name, fallback) => {
+  const hit = args.find((entry) => entry === name || entry.startsWith(`${name}=`));
+  if (!hit) return fallback;
+  const eq = hit.indexOf('=');
+  return eq === -1 ? true : hit.slice(eq + 1);
+};
+
+const dshHome = String(flag('--dsh-home', process.env.DSH_HOME || join(homedir(), '.dsh')));
+const config = normalizeConfig({ dshHome });
+const store = createStore({ root: config.dataDir, dataDir: config.dataDir });
+
+// -- 1. re-judge the pending queue ------------------------------------------
+
+const raw = store.loadPending();
+const items = Array.isArray(raw) ? raw : (raw && raw.items) || [];
+const noisy = [];
+
+const probe = createReview({
+  config,
+  store,
+  skills: { list: () => [], readRules: () => [], root: '', learnedDir: '' },
+  managed: { isManaged: () => false, isProtected: () => false, names: () => [] },
+  curator: { touch: () => {} },
+  logger: console,
+  capture: null,
+});
+
+console.log(`库：${config.dataDir}`);
+console.log(`候选教训：${items.length} 条`);
+console.log('');
+
+const kept = [];
+for (const item of items) {
+  const verdict = probe.gatesFor({
+    statement: item.statement,
+    kind: item.kind,
+    source: item.source,
+    resolved: item.resolved,
+    umbrella: item.umbrella,
+  });
+  const reasons = probe.gateReasons(verdict.gate, verdict.checks);
+  if (!verdict.gate.ok) {
+    noisy.push({ item, reasons });
+    console.log(`  丢弃 ${item.id}  [${item.kind}/${item.source}] ${reasons}`);
+  } else {
+    kept.push(item);
+  }
+}
+
+console.log('');
+console.log(`保留 ${kept.length} 条，丢弃 ${noisy.length} 条`);
+for (const item of kept) {
+  console.log(`  · 保留 ${item.id}  [${item.kind}/${item.source}] ${String(item.statement).slice(0, 100).replace(/\s+/g, ' ')}`);
+}
+
+// -- 2. compact the ledger --------------------------------------------------
+
+const ledgerFile = store.files.ledger;
+let ledgerRows = [];
+try {
+  ledgerRows = readFileSync(ledgerFile, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line));
+} catch {
+  ledgerRows = [];
+}
+
+// A refusal that repeats is one decision, not N. The live run wrote 124
+// identical `review.refuse` rows because the reviewer re-litigated the same
+// candidate every tick; the ledger is a history, not a counter.
+const seen = new Map();
+const compacted = [];
+for (const row of ledgerRows) {
+  const key = `${row.action}|${row.fp || ''}|${row.reason || ''}|${row.id || ''}`;
+  if (row.action === 'review.refuse' && seen.has(key)) {
+    const first = seen.get(key);
+    first.repeats = (first.repeats || 1) + 1;
+    first.lastAt = row.at || first.lastAt;
+    continue;
+  }
+  const copy = { ...row };
+  seen.set(key, copy);
+  compacted.push(copy);
+}
+
+console.log('');
+console.log(`账本：${ledgerRows.length} 行 → ${compacted.length} 行（合并 ${ledgerRows.length - compacted.length} 行重复的拒收记录）`);
+
+// -- 3. apply ---------------------------------------------------------------
+
+if (!apply) {
+  console.log('');
+  console.log('（dry run，未写入任何文件。加 --apply 才会生效。）');
+  process.exit(0);
+}
+
+if (noisy.length) {
+  // savePending takes the ARRAY and writes the envelope itself. Handing it the
+  // envelope instead silently queues nothing — which is how this script would
+  // have "cleaned" a library by throwing away every good proposal with it.
+  store.savePending(kept);
+}
+if (compacted.length !== ledgerRows.length) {
+  const text = compacted.map((row) => JSON.stringify(row)).join('\n');
+  store.writeAtomic(ledgerFile, text ? `${text}\n` : '');
+}
+
+console.log('');
+console.log(`已写入：候选 ${kept.length} 条，账本 ${compacted.length} 行`);
