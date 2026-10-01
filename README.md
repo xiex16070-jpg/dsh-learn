@@ -12,7 +12,7 @@
 | 落盘时机 | 模型显式决定（`learn_skill_manage create` / `learn action=note`） |
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
-| 自测 | `npm test` —— 15 节，294 条断言，零依赖 |
+| 自测 | `npm test` —— 17 节，354 条断言，零依赖 |
 
 ---
 
@@ -49,7 +49,7 @@
 
 ![replay](docs/shots/03-replay.png)
 
-*把一整天的真实会话（6440 个事件）喂回插件：它只提出 2 条候选，两条都是真的工具恢复教训。*
+*把一整天的真实会话喂回插件：一百多条观测里，它只留下 1 条候选，而且是真的工具恢复教训（`edit: Error: cannot modify …: file has not been read`）。其余全被门槛说明理由拒掉。*
 
 ---
 
@@ -88,9 +88,33 @@ function isPotentialSkillPath(root, path) {
 
 `<skills>/learned/<name>/SKILL.md` 是 **3 段**，直接出局；chokidar watcher 也用 `depth: 1`。也就是说：把技能塞进 `<skills>/learned/` 子目录，文件还在，但宿主的技能目录里**看不见它们**，`/技能名` 也加载不到。
 
-### 为什么单独一个根可以
+### 为什么单独一个根可以，而且不需要动宿主配置
 
-provider 的 `Config` 里有 `customSkillDirs: z.array(z.string()).default([])`。注册进去的根以 `source: 'custom'`、`rank: CUSTOM_RANK = 300` 参与扫描；数字小的先命中，所以它排在默认的 `user-dsh` 根（`USER_DSH_RANK = 400`）前面。一层扫描的契约没被破坏，技能也确实收进了自己的文件夹。
+技能目录是一层**提供者**（`@deepseek-ai/dsh-skill` 的 `SkillRegistry`）的合并结果：每个提供者按 `rank` 从小到大参与合并，同名取 rank 小的。所以只要**有人**覆盖这个根就行。
+
+“有人”很容易搞砸。最自然的做法是往 profile 的 `cordis.patch.yml` 里给宿主那个 `skill-filesystem` loader 条目加一条 `customSkillDirs`——**这条路是死的**，而且死得没有声音：
+
+```yaml
+# <profileDir>/cordis.patch.yml
+- id: skill-filesystem
+  name: "@deepseek-ai/dsh-skill-filesystem"
+  config:
+    customSkillDirs: ["<DSH_HOME>\\skills\\learned"]
+```
+
+- 这条补丁**会**合成进最终配置树，`--dump-config` 里看得到 `customSkillDirs` 确实在了；
+- 但它落在的是 **host plane 那一行**，而 `@deepseek-ai/dsh-web-app` 早把这一行 `disabled: true` 了（它把每个 agent 的行挪到了 agent preset 后面，skill 注册表本身留在 host plane）；
+- 顶层 id 补丁只覆盖它**重新声明**的键，`disabled: true` 原样留着。于是配置看着对，provider 从来没挂载过。
+
+所以插件**不再向宿主申请**，而是自己当这个提供者：`lib/provider.js` 通过 `ctx.inject(['skills'], …)` 调用 `ctx.skills.registerProvider()`，把这个根读进技能目录。不需要改 profile、不需要重启，`rank` 取 330——排在 `custom` 根（300）之后、默认 `user-dsh` 根（400）之前，项目根（100/200）仍然优先。
+
+代价是必须守宿主的提供者契约，而它很严：`validateCandidate` 对一行不合法就直接 **throw**，一次 throw 会让整轮 collect 失败，**所有根的技能一起消失**。所以 `list()` 只发射已经满足宿主语法的行，其它一律跳过，并且不向外抛错：
+
+- 目录名不匹配 `^[a-z0-9]+(?:-[a-z0-9]+)*$` → 跳过；
+- 没有 `SKILL.md`（或根本读不出来）→ 跳过；
+- `description` 缺失或只有空白 → 跳过（宿主要求非空）。
+
+根不存在时 `list()` 返回 `{ candidates: [], complete: true }`——空贡献，不是错误。
 
 真实技能根就是：
 
@@ -98,14 +122,14 @@ provider 的 `Config` 里有 `customSkillDirs: z.array(z.string()).default([])`�
 <DSH_HOME>/skills/learned/
 ```
 
-`lib/config.js` 的 `skillsRoot` 是 `<DSH_HOME>/skills`，`lib/skills.js` 只加**一层** `LEARNED_SUBDIR`，并且这一步是幂等的（根已经以 `learned` 结尾就不再追加）。`organize` 注册给宿主的、以及 `doctor` 检查的，都是 `skills.learnedDir` 这一个值。
+`lib/config.js` 的 `skillsRoot` 是 `<DSH_HOME>/skills`，`lib/skills.js` 只加**一层** `LEARNED_SUBDIR`，并且这一步是幂等的（根已经以 `learned` 结尾就不再追加）。`organize` 提供出去的、以及 `doctor` 检查的，都是 `skills.learnedDir` 这一个值。
 
 ### 安全线：没被证明能看见，就不搬
 
-`learned` 这个根在宿主真正按它扫描之前，写进去的技能等于**消失**。所以插件不假设配置文件生效，而是**问宿主的目录自己**：
+`learned` 这个根在技能目录里真的出现之前，写进去的技能等于**消失**。所以插件不假设注册成功，而是**问宿主的目录自己**：
 
 1. 往 `skills.learnedDir` 写一个一次性探针技能 `learn-root-probe/SKILL.md`；
-2. 调宿主的技能目录服务（`ctx.skills`，退路 `ctx.get('skills')`），最多轮询 4 次、每次间隔 150ms，看这个名字回不回来；
+2. 先调用自己那个 provider 的 `invalidate()` 丢掉宿主的 collect 缓存（缓存按 `cwd + scope 链 + revision` 存，不丢的话刚写进去的文件会被旧的快照一直盖住），再调宿主的技能目录服务（`ctx.skills`，退路 `ctx.get('skills')`），最多轮询 4 次、每次间隔 150ms，看这个名字回不回来；
 3. 无论成败都在 `finally` 里删掉探针目录。
 
 只有探针通过（`skills.isLive() === true`）之后：
@@ -116,27 +140,22 @@ provider 的 `Config` 里有 `customSkillDirs: z.array(z.string()).default([])`�
 
 共享根里用户手写的技能永远不动（`organize` 会把它们列在「不动这些」里）。
 
-### 怎么注册
+### 怎么用
 
 ```bash
-# 先看会改什么
+# 先看会改什么（只探测，不搬）
 learn action=organize dryRun=true
-# 真写：补 profile + 探测 + 收拢
+# 真收拢
 learn action=organize dryRun=false
 ```
 
 `organize` 会：
 
-1. 找到当前 profile 目录（依次尝试 `DSH_PROFILE_DIR`、`DSH_PROFILE`、`<DSH_HOME>/profiles/desktop`，要求目录里同时有 `package.json` 与 `cordis.patch.yml`）。
-2. 在 `<profileDir>/cordis.patch.yml` 里找 `skill-filesystem` 这个 loader 条目——按**条目 id** 锚定（`- id: skill-filesystem`，或 `- name: '@deepseek-ai/dsh-skill-filesystem'`），条目的边界是下一个 `- id:`/`- name:` 行。
-3. 该条目里已经有 `customSkillDirs` → 报 `already`，不重复插。
-4. 有 `config:` 就插在它下面，没有就补一行 `config:`；整个 profile 里**没有**这条 loader 条目时，直接在数组末尾**补一条完整条目**（`mode: appended`，否则 `mode: merged`）。
-5. 先备份成 `<cordis.patch.yml>.bak-learn-<base36>`，再写。
-6. 然后跑上面那条探测安全线：探针不通过就**到此为止**，一个技能都不搬，并提示「重启 DSH 宿主后再跑一次 `learn action=organize` 即可完成收拢」；通过了才收拢，并逐个 `claim` + 写账本 `skill.organize`。
+1. 报告技能提供者是否注册上（`已注册 —— 这个根由本插件自己提供，不需要改宿主配置`）；
+2. 跑上面那条探测安全线：探针不通过就**到此为止**，一个技能都不搬；通过了才收拢，并逐个 `claim` + 写账本 `skill.organize`；
+3. **不碰** `<profileDir>/cordis.patch.yml`——这条写入路径已经删掉了，插件不该为了自己的功能去改用户的应用配置。
 
-手工等价物就是在 `<profileDir>/cordis.patch.yml` 的 `skill-filesystem` loader 条目下加同样的三行。
-
-> **loader 配置的改动要重启应用才生效**；技能文件本身已经在技能根里了，重启前后都不会丢。`learn action=doctor` 会把「补丁写了但宿主还没按它扫描」这个中间态单独报出来。
+`learn action=doctor` 的 `host-root` 检查比对的是「插件真实技能根」与「已注册的根」，并注明是不是由本插件自注册提供的。
 
 ---
 
@@ -198,7 +217,7 @@ learn action=organize dryRun=false
 ```
 <DSH_HOME>/
 ├── skills/
-│   ├── learned/                     # 专属技能根（customSkillDirs 注册的就是它）
+│   ├── learned/                     # 专属技能根（由 lib/provider.js 自己提供）
 │   │   ├── self-learning-loop/SKILL.md     # 插件自己的常驻技能，激活时写入
 │   │   ├── durable-preferences/SKILL.md    # 伞：用户长期偏好
 │   │   ├── tool-recovery/SKILL.md          # 伞：工具/命令失败后的排查与恢复
@@ -282,8 +301,8 @@ learn action=organize dryRun=false
 ```
 <profileDir>\
 ├── package.json              # dsh.profile.bundles 里列出 "dsh-learn"
-├── cordis.patch.yml          # loader 配置；organize 会往这里加 customSkillDirs
-└── node_modules\@dsh\learn\  # 本插件的普通目录
+├── cordis.patch.yml          # 你自己的 loader 配置；本插件不写这个文件
+└── node_modules\dsh-learn\   # 本插件的普通目录
     ├── package.json          # dsh.bundle.patch: "./cordis.patch.yml"
     ├── cordis.patch.yml      # bundle layer：insert 一个 id: dsh-learn / name: 'dsh-learn'
     └── lib\index.js
@@ -310,7 +329,7 @@ learn action=status      # 技能根、受管技能数、候选数、curator 会
 learn action=doctor      # root / skills / host-root / legacy / budget / sidecar 六项体检
 ```
 
-`host-root` 检查就是在比对「插件真实技能根」与「宿主注册的 `customSkillDirs`」：没过就说明宿主还没把这个根注册成技能根，文件在，但技能目录里看不到，也加载不了。
+`host-root` 检查就是在比对「插件真实技能根」与「已注册给技能目录的根」：没过就说明这个文件夹还没被任何提供者覆盖，文件在，但技能目录里看不到，也加载不了。
 
 ---
 
@@ -324,7 +343,6 @@ learn action=doctor      # root / skills / host-root / legacy / budget / sidecar
 | `skillsRoot` | `<DSH_HOME>/skills` | 技能根的**父**目录；真实的根是它下面的 `learned/`（`skills.learnedDir`） |
 | `legacySkillsRoot` | `<DSH_HOME>/skills` | 共享根：专用根被宿主确认可见之前的落点，也是 `organize` 的迁移源 |
 | `dataDir` | `<DSH_HOME>/learn/data` | 状态、账本、候选、归档 |
-| `hostCustomSkillDirs` | `[]` | **仅信息性**：宿主用自己的配置注册技能根（真正作数的是探针结果 `skills.isLive()`，不是这个键） |
 | `capture.maxSessions` | `8` | 内存里同时保留几个会话的窗口（LRU） |
 | `capture.maxItemsPerSession` | `120` | 单会话观测上限 |
 | `capture.maxItemChars` | `400` | 单条观测压缩后的字符上限 |
@@ -351,17 +369,17 @@ learn action=doctor      # root / skills / host-root / legacy / budget / sidecar
 node scripts/selftest.mjs
 ```
 
-`scripts/selftest.mjs` 是**独立、零依赖**的纯断言脚本（`check(label, condition, extra)`，失败即 `process.exit(1)`），15 节：脱敏与注入筛查、写锁与状态、专属根与规则手术、P0-1 回归与反捕获门槛、**真实对话里的假阳性回归**、观测窗口、**真实事件流与 callId 配对**、候选→确认→强化→合并→撤回、归属与销毁权、curator 生命周期、工具边界、**探针（宿主说了算）**、迁移、常驻技能文件、真实签名解析。它**不碰真实的 `~/.dsh`**：每一节用 `<插件目录>/.selftest-home/<节名>` 做一次性的 DSH home。
+`scripts/selftest.mjs` 是**独立、零依赖**的纯断言脚本（`check(label, condition, extra)`，失败即 `process.exit(1)`），17 节：脱敏与注入筛查、写锁与状态、专属根与规则手术、P0-1 回归与反捕获门槛、**真实对话里的假阳性回归**、观测窗口、**真实事件流与 callId 配对**、候选→确认→强化→合并→撤回、归属与销毁权、curator 生命周期、工具边界、**探针（宿主说了算）**、**提供者契约（`validateCandidate` 不允许一行出错）**、迁移（看得见才搬 / 旧副本不能遮蔽新根）、常驻技能文件、真实签名解析。它**不碰真实的 `~/.dsh`**：每一节用 `<插件目录>/.selftest-home/<节名>` 做一次性的 DSH home。
 
 两件与真机安全有关的事：
 
-- 它在模块加载时就把 `process.env.DSH_PROFILE_DIR` 指向沙箱里的假 profile（并删掉 `DSH_PROFILE`），否则 `organize` 那一节会去改**你自己**的 `~/.dsh/profiles/desktop/cordis.patch.yml`。
+- 它在模块加载时就把 `process.env.DSH_PROFILE_DIR` 指向沙箱里的假 profile（并删掉 `DSH_PROFILE`），然后断言 `organize` **没有**动过那个文件——插件现在不该写用户的 profile 补丁，这条断言就是防止它退回去。
 - 成功时删掉沙箱，失败时保留现场供检查。
 
 当前实际状态：
 
 ```
-294/294 checks passed — all green
+354/354 checks passed — all green
 ```
 
 「真实对话里的假阳性回归」那一节把**跑挂过插件的原话逐字抄进去**当夹具（含那 240 字的 PowerShell 脚本原文、
@@ -373,7 +391,7 @@ node scripts/selftest.mjs
 
 | 脚本 | 用途 |
 |---|---|
-| `scripts/selftest.mjs` | 15 节断言，`npm test` |
+| `scripts/selftest.mjs` | 17 节断言，`npm test` |
 | `scripts/replay-session.mjs` | 把**真实会话重放**给插件：`node scripts/replay-session.mjs --latest 1`。会话文件是一串**逐次追加拼接的 zstd 帧**，`zstdDecompressSync` 只解得出第一帧——脚本按 magic `28 b5 2f fd` 逐帧解再拼。这是最有说服力的验收方式 |
 | `scripts/purge-noise.mjs` | 用**插件自己的** `review.gatesFor()` 重判队列里的每条候选（清理工具不该有自己的质量主张），并合并账本里重复的拒收行。默认 dry-run，`--apply` 才写 |
 | `scripts/cleanup-v010.mjs` | 清 v0.1.0 的脏数据：frontmatter 里的 `managed-by`/`learn.*` 遥测、伞技能里那段插件自己的英文独白规则、旧形状的裸数组 `pending.json`、账本/lessons 里关于插件自己的散文；**没有 v0.1.0 标记的用户技能一律 SKIP**。另外把数据目录从 `<DSH_HOME>/learn/` 搬到 `<DSH_HOME>/learn/data/`（`state.json` 按键合并，新值优先） |

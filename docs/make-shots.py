@@ -255,7 +255,7 @@ def shot_selftest():
         lines.append(line)
     lines = [l for l in lines if l.strip()][-14:]
     lines = [("npm test", "cmd"), ("", "blank")] + lines
-    return save(window(lines, width=980, title="scripts/selftest.mjs — 15 节，零依赖"), "02-selftest.png")
+    return save(window(lines, width=980, title="scripts/selftest.mjs — 17 节，零依赖"), "02-selftest.png")
 
 
 def shot_replay():
@@ -268,9 +268,13 @@ def shot_replay():
         if started:
             keep.append(pretty(line))
     keep = [l for l in keep if l.strip()][:11]
+    # The event count is read from the capture, never typed: a hard-coded number
+    # here goes stale the moment the session it was copied from grows.
+    counts = next((l for l in raw if " 事件 " in l), "").strip()
+    caption = f"把真实会话（{counts.split('（')[-1].rstrip('）') if counts else '数千个事件'}）喂回插件，看它会提出什么："
     keep = [
         ("node scripts/replay-session.mjs --latest 1", "cmd"),
-        "把真实会话（6440 个事件）喂回插件，看它会提出什么：",
+        caption,
         ("", "blank"),
     ] + keep
     return save(window(keep, width=1120, title="真实会话回放"), "03-replay.png")
@@ -288,7 +292,7 @@ def shot_layout():
         ("<DSH_HOME>/", DIM),
         ("├── skills/", FG),
         ("│   ├── my-own-skill/           ← 你手写的，插件永不触碰", DIM),
-        ("│   └── learned/                ← 专属根（customSkillDirs 登记）", GREEN),
+        ("│   └── learned/                ← 专属根（本插件自注册的技能提供者扫这里）", GREEN),
         ("│       ├── self-learning-loop/SKILL.md", FG),
         ("│       ├── durable-preferences/SKILL.md", FG),
         ("│       ├── tool-recovery/SKILL.md", FG),

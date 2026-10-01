@@ -22,7 +22,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,6 +33,7 @@ import { makeExtractor } from '../lib/extract.js';
 import { createGraph } from '../lib/graph.js';
 import { migrateOwnSkills, optionalSkillsService, probeLearnedRoot } from '../lib/index.js';
 import { createManaged } from '../lib/managed.js';
+import { LEARNED_PROVIDER, LEARNED_RANK, createLearnedProvider, registerLearnedProvider } from '../lib/provider.js';
 import { createReview } from '../lib/review.js';
 import {
   escapeBraces,
@@ -46,6 +47,7 @@ import { createStore } from '../lib/storage.js';
 import { createTools } from '../lib/tools.js';
 import {
   SIGNAL,
+  SELF_NARRATION_RE,
   classifyText,
   condense,
   desensitize,
@@ -525,6 +527,53 @@ start('regression — the false positives the LIVE run actually produced');
   // A lesson that merely opens with a number must not be mistaken for a listing.
   eq('one numbered line is not a listing', looksLikeDataDump('1: 先用 pnpm 装依赖，再跑 node --check'), false);
 
+  // ---- third pass: the two survivors of the SECOND sweep -------------------
+  //
+  // After the fix above shipped into `lib/`, the finished gates were run over
+  // the live queue a second time. Two entries still passed, and they share one
+  // trait: both quote this plugin's own refusal vocabulary, because both ARE
+  // this plugin's output. One is a purge report (a list of refused candidates);
+  // the other is the agent's own write-up about the plugin's gates. Verified
+  // VERBATIM as they sat in `~/.dsh/learn/data/pending.json`.
+  const secondSweep = [
+    ': 丢弃 pmupaet3hhf82 [RECOVERED_FAILURE/auto-tool] 是过程叙述或插件自身的讨论，不是可迁移的做法；是工具输出的原文（清单/搜索结果/文件内容），不是可迁移的做法；工具输出里读不出具体报错（不是一条能照做的规则）；读不出可迁移的做法或具体对象 丢弃 pmupafb1kat7w [RECOVERED_FAILURE/auto-tool] 是过程叙述或插件自身的讨论，不是可迁移的做法；工具输出里读不出具体报错（不是一条能照做的规则）；…',
+    '**DECISIVE: the live plugin now returns 「是工具输出的原文（清单/搜索结果/文件内容），不是可迁移的做法」** — that reason only exists in the CURRENT source (the `looksLikeDataDump` gate I added in the final round). **So the restart DID load the final code.** My earlier c…',
+  ];
+  // The tag form is what the queue dump prints, so it is recognised as machine
+  // output on its own — even with no `<path>` and no numbered lines in sight.
+  eq(
+    'the plugin\'s own candidate-tag listing is recognised as data',
+    looksLikeDataDump(secondSweep[0]),
+    true,
+  );
+  // The agent write-up carries no tag. It is caught because it quotes the
+  // plugin's own refusal wording, which only this plugin ever produces.
+  eq(
+    'quoting the plugin\'s own refusal wording is self-discussion',
+    SELF_NARRATION_RE.test(secondSweep[1]),
+    true,
+  );
+  for (const [i, text] of secondSweep.entries()) {
+    eq(
+      `second-sweep survivor #${i + 1} is refused as a recovered failure`,
+      gateObservation({ statement: text, kind: 'RECOVERED_FAILURE', resolved: true }, { source: 'auto-tool' }).ok,
+      false,
+    );
+  }
+  eq(
+    'and that write-up is refused as a technique too',
+    gateObservation({ statement: secondSweep[1], kind: 'TECHNIQUE', resolved: true }, { source: 'auto-assistant' }).ok,
+    false,
+  );
+  // Precision check: the new rule keys on this plugin's own refusal wording, not
+  // on the topic of refusing things. An ordinary Chinese technique that happens
+  // to describe dropping bad data must still pass.
+  eq(
+    'a bare Chinese technique is untouched by the new wording rule',
+    gateObservation({ statement: '把校验放在写盘之前：先过门槛再动手，避免脏数据落盘', kind: 'TECHNIQUE', resolved: true }, { source: 'auto-assistant' }).ok,
+    true,
+  );
+
   // Memory machinery talk is refused from EVERY source, including the user.
   eq(
     'plugin self-discussion is refused from a user turn too',
@@ -719,6 +768,32 @@ start('review — propose, promote, reinforce, consolidate, undo');
   check(
     'doctor notices the root is not registered with the host',
     doctor.checks.some((entry) => entry.id === 'host-root' && entry.ok === false),
+  );
+
+  // `legacy` is positional (anything outside the dedicated root), so a
+  // hand-written skill is indistinguishable from our own leftover by path
+  // alone. Doctor has to tell them apart by ownership, or the self-check stays
+  // red forever over a file this plugin must never touch. A fresh world keeps
+  // the two cases apart — the world above already stranded one of ours.
+  const clean = makeWorld(makeHome('review-doctor'));
+  const legacyCheck = () => clean.review.doctor({ customRoots: [] }).checks.find((entry) => entry.id === 'legacy') || {};
+  clean.skills.write('hand-written', { description: '用户自己写的', body: '# x\n' });
+
+  const foreign = legacyCheck();
+  check('a hand-written skill in the shared root is not a fault', foreign.ok === true, foreign.detail);
+  check(
+    'and doctor says out loud that it is leaving it alone',
+    String(foreign.detail).includes('hand-written') && String(foreign.detail).includes('不是本插件创建的'),
+    foreign.detail,
+  );
+
+  clean.managed.claim('hand-written', { kind: 'learned', source: 'test' });
+  const stranded = legacyCheck();
+  check('but once this plugin owns it, leaving it there is a fault', stranded.ok === false, stranded.detail);
+  check(
+    'and the fault says it is ours, not that it must not be touched',
+    String(stranded.detail).includes('hand-written') && String(stranded.detail).includes('本插件自己'),
+    stranded.detail,
   );
 }
 
@@ -938,16 +1013,16 @@ start('tools — the model-facing boundary');
   check('consolidate dry-run is reachable', typeof consolidate === 'string' && consolidate.length > 0, consolidate);
 
   const organizeDry = await call(tools.learn, { action: 'organize', dryRun: true });
-  check('organize dry-run reports without touching the profile', typeof organizeDry === 'string' && organizeDry.length > 0, organizeDry);
-  const fixturePatch = join(FAKE_PROFILE, 'cordis.patch.yml');
-  check('dry-run really did not write the profile', !readFileSync(fixturePatch, 'utf8').includes('customSkillDirs'));
+  check('organize dry-run reports without touching anything', typeof organizeDry === 'string' && organizeDry.length > 0, organizeDry);
   const organizeReal = await call(tools.learn, { action: 'organize', dryRun: false });
-  check('organize really runs against the fixture profile', typeof organizeReal === 'string' && organizeReal.length > 0, organizeReal);
-  const patched = readFileSync(fixturePatch, 'utf8');
-  check('the custom root landed in the profile patch', patched.includes('customSkillDirs'), patched);
-  check('the patch preserves the original entry', patched.includes("name: '@deepseek-ai/dsh-skill-filesystem'"), patched);
-  check('the patch registers the learned root itself', patched.includes(JSON.stringify(skills.learnedDir)), patched);
-  check('the patch keeps the entry a valid loader id', /- id: skill-filesystem/.test(patched), patched);
+  check('organize really runs', typeof organizeReal === 'string' && organizeReal.length > 0, organizeReal);
+  check('organize names the dedicated root', String(organizeReal).includes(skills.learnedDir), organizeReal);
+  check('organize reports the provider instead of a profile patch', /技能提供者/.test(String(organizeReal)), organizeReal);
+  // The dedicated root is served by this plugin's own provider now, so nothing
+  // may edit the user's profile — that was the defect the provider replaced.
+  const untouched = readFileSync(join(FAKE_PROFILE, 'cordis.patch.yml'), 'utf8');
+  check('neither run wrote the profile patch', !untouched.includes('customSkillDirs'), untouched);
+  check('and no backup file was left behind', !readdirSync(FAKE_PROFILE).some((name) => name.includes('.bak-learn-')), readdirSync(FAKE_PROFILE));
 
   check('learn_review dry-run works', Boolean(await call(tools.learnReview, { action: 'dry-run' })));
   check('minScore is a real threshold, not an inverted flag', Boolean(await call(tools.learnReview, { action: 'run', minScore: 99 })));
@@ -1003,6 +1078,195 @@ start('probe — the host decides whether the folder is real');
     optionalSkillsService({ get: (key) => (key === 'skills' ? watching : null) }) === watching,
     true,
   );
+}
+
+// =============================================== 9c. the learned-root provider
+//
+// The dedicated folder is served by this plugin's OWN skill provider instead of
+// a host-side `customSkillDirs` patch, because the row that patch targeted
+// (`skill-filesystem`) is disabled in the host plane and the agent catalog comes
+// from per-preset rows. That makes this module the highest-risk surface in the
+// bundle: `validateCandidate` in `@deepseek-ai/dsh-skill` THROWS on a malformed
+// row, and one throw aborts the entire collect — every skill in every root
+// vanishes. So the registry's rules are re-implemented below and every refusal
+// path is pinned.
+//
+// The re-implementation mirrors the real file at
+// `dsh/node_modules/@deepseek-ai/dsh-skill/lib/index.js`: SKILL_NAME at line 17,
+// validateCandidate at 452-464, validateDefinition at 471-490.
+
+start('provider — the learned root satisfies the host skill contract');
+{
+  const home = makeHome('provider');
+  const { skills } = makeWorld(home);
+  const root = skills.learnedDir;
+  const put = (name, text) => {
+    mkdirSync(join(root, name), { recursive: true });
+    writeFileSync(join(root, name, 'SKILL.md'), text, 'utf8');
+  };
+  put('alpha-skill', '---\nname: alpha-skill\ndescription: 先 A 再 B\n---\n\n# alpha\n\n正文一。\n');
+  put('beta-skill', '---\nname: beta-skill\ndescription: 另一条做法\nwhenToUse: 只在 Windows 上\n---\n\n正文二。\n');
+
+  const provider = createLearnedProvider({ root });
+  eq('the provider declares its own name', provider.name, LEARNED_PROVIDER);
+  check('it exposes list and get', typeof provider.list === 'function' && typeof provider.get === 'function');
+
+  const observation = provider.list({});
+  check('list returns the observation shape', Array.isArray(observation.candidates), Object.keys(observation));
+  eq('both skills are offered', observation.candidates.length, 2);
+  const names = observation.candidates.map((row) => row.name).sort();
+  eq('names come through sorted', names.join(','), 'alpha-skill,beta-skill');
+
+  // --- the registry's own validation, re-implemented -------------------------
+  const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const validateCandidate = (row, providerName) => {
+    if (typeof row?.name !== 'string' || !SKILL_NAME.test(row.name)) throw new Error(`bad name: ${row?.name}`);
+    if (typeof row.description !== 'string' || !row.description) throw new Error('bad description');
+    if (typeof row.source !== 'string') throw new Error('bad source');
+    if (typeof row.rank !== 'number' || !Number.isFinite(row.rank)) throw new Error('bad rank');
+    if (row.provider !== providerName) throw new Error('bad provider');
+    if (row.whenToUse !== undefined && typeof row.whenToUse !== 'string') throw new Error('bad whenToUse');
+    if (row.path !== undefined && typeof row.path !== 'string') throw new Error('bad path');
+    if (row.invocation !== undefined) {
+      if (typeof row.invocation.modelInvocable !== 'boolean') throw new Error('bad modelInvocable');
+      if (typeof row.invocation.userInvocable !== 'boolean') throw new Error('bad userInvocable');
+    }
+  };
+  let valid = true;
+  let why = '';
+  for (const row of observation.candidates) {
+    try {
+      validateCandidate(row, provider.name);
+    } catch (error) {
+      valid = false;
+      why = error.message;
+    }
+  }
+  check('every row would survive validateCandidate', valid, why);
+  const alpha = observation.candidates.find((row) => row.name === 'alpha-skill');
+  const beta = observation.candidates.find((row) => row.name === 'beta-skill');
+  eq('the description is carried verbatim', alpha.description, '先 A 再 B');
+  eq('whenToUse is carried when present', beta.whenToUse, '只在 Windows 上');
+  eq('whenToUse is omitted when absent', 'whenToUse' in alpha, false);
+  eq('the row points at its real file', alpha.path, join(root, 'alpha-skill', 'SKILL.md'));
+  eq('both invocation flags default to true', alpha.invocation.modelInvocable && alpha.invocation.userInvocable, true);
+  check(
+    'rank outranks the shared root but not a project root',
+    alpha.rank === LEARNED_RANK && alpha.rank > 300 && alpha.rank < 400,
+    alpha.rank,
+  );
+
+  // --- get() ---------------------------------------------------------------
+  const defined = provider.get(alpha, {});
+  const validateDefinition = (row) => {
+    if (typeof row?.name !== 'string' || !SKILL_NAME.test(row.name)) throw new Error('bad name');
+    if (typeof row.description !== 'string' || !row.description) throw new Error('bad description');
+    if (typeof row.source !== 'string' || typeof row.provider !== 'string') throw new Error('bad source/provider');
+    if (typeof row.content !== 'string') throw new Error('bad content');
+  };
+  try {
+    validateDefinition(defined);
+  } catch (error) {
+    check('get() satisfies validateDefinition', false, error.message);
+  }
+  eq('get() keeps the candidate name', defined.name, 'alpha-skill');
+  eq('get() returns the body without frontmatter', defined.content.trim(), '# alpha\n\n正文一。');
+  check('get() does not leak frontmatter into the body', !defined.content.includes('description:'), defined.content);
+  check('get() re-reads the file, so an edit is picked up', (() => {
+    writeFileSync(join(root, 'alpha-skill', 'SKILL.md'), '---\ndescription: 先 A 再 B\n---\n\n改过了。\n', 'utf8');
+    return provider.get(alpha, {}).content.trim() === '改过了。';
+  })());
+
+  // --- everything that must be refused rather than thrown -------------------
+  put('My Skill', '---\ndescription: 大写和空格都不是合法技能名\n---\n\nx\n');
+  mkdirSync(join(root, 'no-file-here'), { recursive: true });
+  put('empty-description', '---\nname: empty-description\n---\n\n没有描述。\n');
+  put('dashes--doubled', '---\ndescription: 名字里有连续短横线\n---\n\nx\n');
+  put('unreadable', '---\nname: unreadable\ndescription:   \n---\n\n描述只有空白。\n');
+  const filtered = provider.list({});
+  const survived = filtered.candidates.map((row) => row.name).sort();
+  eq('only the valid rows are offered', survived.join(','), 'alpha-skill,beta-skill');
+  check('a bad folder name is skipped, not thrown', !survived.includes('My Skill'), survived);
+  check('a folder with no SKILL.md is skipped', !survived.includes('no-file-here'), survived);
+  check('a missing description is skipped', !survived.includes('empty-description'), survived);
+  check('a doubled dash is skipped', !survived.includes('dashes--doubled'), survived);
+  let stillValid = true;
+  for (const row of filtered.candidates) {
+    try {
+      validateCandidate(row, provider.name);
+    } catch {
+      stillValid = false;
+    }
+  }
+  check('the filtered list still validates', stillValid);
+
+  // --- a root that does not exist is an empty contribution, not an error ----
+  const ghost = createLearnedProvider({ root: join(home, 'skills', 'nope') });
+  const nothing = ghost.list({});
+  eq('a missing root offers nothing', nothing.candidates.length, 0);
+  check('and it says the observation is complete', nothing.complete === true, nothing.complete);
+  let threw = false;
+  try {
+    ghost.get({ name: 'alpha-skill' });
+  } catch {
+    threw = true;
+  }
+  check('get() on a vanished skill throws instead of returning junk', threw);
+
+  // --- registration wiring --------------------------------------------------
+  const registered = [];
+  let control = null;
+  const fakeScoped = {
+    skills: {
+      registerProvider(create) {
+        control = {};
+        control.invalidate = () => registered.push('invalidate');
+        const built = create(control);
+        registered.push(built.name);
+        return () => registered.push('disposed');
+      },
+    },
+    logger: { info() {}, warn() {}, error() {} },
+  };
+  const sink = [];
+  let injectArgs = null;
+  const handle = registerLearnedProvider(
+    {
+      inject(keys, run) {
+        injectArgs = keys;
+        run(fakeScoped);
+      },
+      logger: { info() {}, warn() {}, error() {} },
+    },
+    { root, disposers: sink },
+  );
+  eq('it injects exactly the skills service', Array.isArray(injectArgs) ? injectArgs.join(',') : String(injectArgs), 'skills');
+  eq('the provider registered under its own name', registered[0], LEARNED_PROVIDER);
+  eq('registration reports success', handle.registered, true);
+  eq('the disposer is filed for teardown', sink.length, 1);
+  eq('refresh() drives the registry invalidation', handle.refresh(), true);
+  eq('and it really called invalidate', registered.includes('invalidate'), true);
+
+  // A hostile registry (duplicate provider name, missing service) must not be
+  // able to abort plugin activation.
+  let survivedHostile = true;
+  try {
+    registerLearnedProvider(
+      { inject(keys, run) { run({ skills: { registerProvider() { throw new Error('a skill provider named "dsh-learn" is already registered'); } }, logger: {} }); }, logger: {} },
+      { root, disposers: [] },
+    );
+  } catch {
+    survivedHostile = false;
+  }
+  check('a registry that refuses the name does not throw out', survivedHostile);
+  let survivedNoInject = true;
+  try {
+    registerLearnedProvider({}, { root, disposers: [] });
+    registerLearnedProvider({ inject() { throw new Error('no skills service'); } }, { root, disposers: [] });
+  } catch {
+    survivedNoInject = false;
+  }
+  check('a context with no inject() does not throw either', survivedNoInject);
 }
 
 // ============================================================ 10. migration
