@@ -43,9 +43,14 @@ const INCLUDE = [
   'docs/make-shots.py',
 ];
 
+// An allow-list, not a deny-list: this directory also collects throwaway probes
+// from unrelated work (launch-probe, loc-probe) and one-shot data repairs
+// (cleanup-v010, asar-inspect). A deny-list silently ships the next one.
+const PUBLISHED_SCRIPTS = ['selftest.mjs', 'replay-session.mjs', 'purge-noise.mjs', 'publish-github.mjs'];
+
 const GLOBS = [
   ['lib', (name) => name.endsWith('.js')],
-  ['scripts', (name) => name.endsWith('.mjs') && !['asar-inspect.mjs', 'cleanup-v010.mjs'].includes(name)],
+  ['scripts', (name) => PUBLISHED_SCRIPTS.includes(name)],
   ['docs/shots', (name) => name.endsWith('.png')],
 ];
 

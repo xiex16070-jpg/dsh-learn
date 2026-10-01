@@ -54,6 +54,7 @@ import {
   isActionable,
   isMostlyRedacted,
   looksLikeCommandDump,
+  looksLikeDataDump,
   looksLikeError,
   looksLikeIncidentReport,
   looksLikeStatusReport,
@@ -481,6 +482,48 @@ start('regression — the false positives the LIVE run actually produced');
     ).ok,
     true,
   );
+
+  // ---- second pass: what was left after the first pass shipped ------------
+  //
+  // These four are not from a fixture anyone wrote. They are the entries that
+  // were still sitting in the LIVE queue after the gates above were finished,
+  // found by running the finished gates over `~/.dsh/learn/data/pending.json`
+  // and printing the survivors. Each one had passed every check, and each one
+  // is a `read`/`grep` envelope or a CI verdict rather than a lesson.
+  const survivors = [
+    ': Found 1 match _agent-learning\\lib\\capture.js Line 143: recordToolResult(sessionId, { tool, failed, content, args, meta = {} }) {',
+    ': <path>C:\\Users\\admin\\.dsh\\profiles\\desktop\\cordis.patch.yml</path> <type>file</type> <content> 1: # Your patch layer for this dsh profile, applied after every bundle layer: 2: # a top-level YAML array of loader patch entries.',
+    ': Found 2 matches _agent-learning\\README.md Line 215: │ ├── learning-graph.json # 学习图（技能 / 教训 / 候选 / 灵枢 memory 节点） Line 220: └── .dsh-memory/data/mdcg/contextual # 灵枢 memory 节点来源（没有就跳过，不报错）',
+    ": status: 'completed', conclusion: 'failure', `Resolving the pull request for this run failed: ${e.message}`, 'workflow; if it keeps failing a maintainer needs to look at it.', ##[group]Checking out the ref",
+  ];
+  eq('a read/grep envelope is recognised as data', looksLikeDataDump(survivors[0]), true);
+  eq('so is the read tool\'s <path> form', looksLikeDataDump(survivors[1]), true);
+  eq('so is a CI verdict line', looksLikeStatusReport(survivors[3]), true);
+  for (const [i, text] of survivors.entries()) {
+    eq(
+      `queue survivor #${i + 1} is refused as a recovered failure`,
+      gateObservation({ statement: text, kind: 'RECOVERED_FAILURE', resolved: true }, { source: 'auto-tool' }).ok,
+      false,
+    );
+  }
+  // The two lessons the real-session replay actually produced must still pass —
+  // a gate that refuses everything is not a gate.
+  check(
+    'the real replay lesson still passes',
+    gateObservation(
+      { statement: 'edit: Error: old_string was not found in "lib\\\\review.js"', kind: 'RECOVERED_FAILURE', resolved: true },
+      { source: 'auto-tool' },
+    ).ok,
+  );
+  check(
+    'and so does the replace_all one',
+    gateObservation(
+      { statement: 'edit: Error: old_string matched 2 times in "lib\\\\review.js"; provide a more specific old_string or set replace_all to true', kind: 'RECOVERED_FAILURE', resolved: true },
+      { source: 'auto-tool' },
+    ).ok,
+  );
+  // A lesson that merely opens with a number must not be mistaken for a listing.
+  eq('one numbered line is not a listing', looksLikeDataDump('1: 先用 pnpm 装依赖，再跑 node --check'), false);
 
   // Memory machinery talk is refused from EVERY source, including the user.
   eq(
