@@ -13,7 +13,7 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 18 节 399 条断言，浏览器半边 348 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 20 节 546 条断言，浏览器半边 348 条，零依赖 |
 
 ---
 
@@ -255,6 +255,27 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 
 同一个版本里还删掉了一批**够不着的死代码**：`lib/blocks.js` 从九个导出缩到一个（其余八个描述的是另一套系统：用户侧/环境侧的记忆分流、hub、`external_dirs`、读写前置守卫），`lib/storage.js` 的 `writeReport`/`patchReport`/`moveToArchive`/`listArchived` 和 `reports/`、`staging/` 两个**每次启动都建、从来没有写过**的目录，`lib/skills.js` 的 `stage`。判据写在 `blocks.js` 的头部注释里：**没有任何代码路径能走到的字符串不是文档，是第二份真相，而它只会漂移**。
 
+### v0.3.1：把规则放进提示词，把后门关上
+
+又一次独立审查——这次它读完了 16 个模块、跑了自测、**在沙箱里复现了一个数据丢失 bug**，还把宿主自己的插件开发指南从 `app.asar` 里挖了出来。那份指南正好给出了三个弱项的官方补法，于是这个版本一半是修 bug，一半是**接上宿主本来就有、而这里一个都没用的扩展点**。
+
+| # | 症状 | 修法 |
+|---|---|---|
+| 37 | **每次启动都会删掉自己刚写下的技能正文。** 激活顺序是「写常驻技能 → 探测专属根」：写入时 `live` 还是 `false`，所以写进了共享根；探测随后成功，迁移逻辑看到两个根里都有这个技能，判定共享根那份是「陈旧副本」，把**新的**删了，留下旧的。于是 v0.3.0 唯一一条真正闭合回路的指令（「顺手就记」）从来没进过模型的上下文——这解释了为什么规则数是 0。更坏的一种：整轮探测都失败时，那一整个会话学到的规则全写进共享根，然后被下一次成功启动当作副本删掉，账本上只有一行 `pruned: 1` | 三处一起改：① `skills.write()` 写进**这个技能当前所在**的根，而不是「当前活跃」的根——`activeRoot()` 和 `locate()` 在探测未应答期间本来就不一致；② 去重改成**按内容和 mtime 判**，谁新留谁，平手时留长的，并记一行 `skill.dedupe` 账本（「专属根权威」在激活窗口里是错的）；③ 常驻技能的写入挪到探测**之后**，而且挂在 `finally` 上——**探测决定它住在哪，从不决定它是否存在** |
+| 38 | 别人一句一次性的任务指令进了环境事实：`You are writing ONE new file and nothing else. Do not edit any other file…`。它一旦被提升，就会变成以后每个会话都要遵守的假约束。已有的过滤只针对**智能体自己**的话（`AGENT_DELIBERATION_RE` 只对非豁免来源生效），没有任何一条看得见**第二人称**的祈使 | `DURABLE_FACT` 单独加两道：先说得出具体对象（路径/版本/端点/开关），再拒绝第二人称祈使。`USER_PREFERENCE` 一字未动——「以后都用中文回复我」也是第二人称，而它正是该留下的 |
+| 39 | 智能体在**讨论本插件自己的正则**，被判成 `TECHNIQUE`。这是 v0.1 那个 P0 的翻版，只是这次文本里全是**带反引号的内部标识符**，`META_DISCUSSION_RE` 看不见 | 把插件自己的内部标识符（`isActionable`、`PROCEDURAL_RE`、`gateObservation`、`looksLike\<大写\>` …）加进 `META_DISCUSSION_RE`。词表永远比现实慢一轮，所以在注释里写明了这一点 |
+| 40 | `actionable` 这一门靠**字符串匹配另一个模块的拒收措辞**（`/可迁移\|具体对象/`）来判断——正是本插件 v0.1 自己警告过的形状：「前缀匹配会在对方改字的那一刻悄悄烂掉」。而 v0.3.0 确实改过其中一条 | 直接调 `isActionable()` 反而错了（实测：拒收却六项全绿，因为拒收理由和「不可执行」不是同一件事）——所以换的是**机制**不是位置：`gateObservation()` 现在返回 `codes`，拒收按**结构化代码**分类，`review.js` 查 `SHAPE_REFUSALS` 集合，措辞改了也不影响 |
+| 41 | 账本无上限、读的时候整个重读：399 行 / **857KB / 23 小时**，其中 **78% 是 `review.propose`**——每一行都把当次 `filed`/`skipped` 数组整个嵌进去。同时强化路径上的 `hits` 是**写死的 `2`**，和 v0.2 修掉的「常量 hits」是同一类谎，只是换了个地方 | `propose` 行改成记**计数 + 最多 5 条样本**；`history`/`summary` 用 `{limit: 500}` 之类的有界读；账本超过 2MB 自动轮转（保留最近 3 个），并且**轮转失败不许中断记账**——「一个拒绝记录发生了什么的账本，比一个太大的账本更糟」。`hits` 改成真的数 `review.reinforce` 行。另外 `seen.json` 指纹旁挂文件让 `novel` 这门第一次真的有数据来源：它以前被写死成 `true`，而唯一的全量读者 `knownFingerprints()` 是个**没人调用的导出** |
+| 42 | 队列里躺着一份「我做了什么」的汇报，正迈向 `environment-facts`。它不是第二人称，而且满是具体对象——两道路闸都拦不住它。**这条是跑 `purge-noise.mjs` 跑出来的，不是读代码读出来的** | `WORK_REPORT_RE` 加在 `DURABLE_FACT` 分支上：汇报讲的是过去某个时点，环境事实是以后每次都要成立的前提。同一轮里 `purge-noise.mjs` 自己**崩了**（`TypeError: skills.exists is not a function`）——因为它手搓了一个 `skills` 替身，缺一个方法，而那个方法只在 `novel` 从写死变成真跑之后才会被调用。改成用**真的**服务：一个能跟它所替身的接口漂移的替身不是捷径，是接口的第二份定义 |
+
+**这一版真正新增的能力**：一个 `lib/host.js`，只走宿主指南里最弱的两级，并且**每一级都是可选的**（`ctx.get(name)` 拿不到就退化成「插件照常工作，只是少一层网」）：
+
+- `ctx.systemPrompt.section()` —— 把判断标准放回模型眼前。一段**字节稳定**的纪律段落（`order: 90`），外加一段只在队列非空时才产出文字的队列提醒（`order: 91`）。字节稳定是硬要求：一段每回合都变的提示词会让前缀缓存每次失效。
+- `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
+- 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
+
+自检现在 **20 节 546 条断言**（浏览器半边 348 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+
 ---
 
 ## 磁盘布局
@@ -339,11 +360,13 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 | 检查 | 拒绝什么 | 拒收理由（逐字） |
 |---|---|---|
 | `general`（可迁移） | 短于 8 字或长于 400 字的陈述 | `陈述过短` / `陈述过长（>400 字）` |
-| `actionable`（可执行） | `gateObservation()` 里带「可迁移」或「具体对象」字样的理由 | `读不出可迁移的做法或具体对象` |
+| `actionable`（可执行） | `gateObservation()` 给出的**拒收代码**落在 `SHAPE_REFUSALS` 集合里——不是靠匹配对方的中文措辞（v0.1–v0.3.0 是靠 `/可迁移\|具体对象/`，正是本插件自己警告过的坏形状） | `读不出可迁移的做法或具体对象` |
 | `durable`（持久） | 恒定通过——持久性在分类阶段就保证了 | — |
 | `no-incident`（无事故绑定） | 含 `PR/issue/ticket #N` 或 `YYYY-MM-DD` 日期 | `含日期或工单号` |
 | `routed`（伞路由） | `classifyRoute()` 给不出伞的教训（**不新建技能**） | `没有匹配的类级技能（不新建技能）` |
-| `novel`（非重复） | 恒定通过——真正的去重在写入时用 `tokenSimilarity ≥ 0.6` 做强化 | — |
+| `novel`（非重复） | 这条已经写成规则了（指纹比对 `seen.json` 与本插件写过的全部规则）；队列里的重复不算——重复投递是加一次 hit，不是拒绝 | `这条已经写成规则了（同样的候选不会再提一次）` |
+
+`gateObservation()` 现在除 `reasons` 外还返回 `codes`（`empty` / `short` / `long` / `redacted` / `command-dump` / `meta-discussion` / `unresolved` / `one-off` / `incident` / `data-dump` / `status` / `tool-envelope` / `no-error-shape` / `env-state` / `negative-claim` / `durable-task-directive` / `durable-work-report` / `durable-no-object` / `not-actionable`）。**理由给人看，代码给代码看**——两者一一对应，自测里有一条断言逼着它们等价。
 
 更早一层还有 `text.js` 的 `gateObservation()`，它的理由是拒收文本的正源：
 
@@ -353,7 +376,10 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 看起来是一次性要求，不是通用规则
 属于环境状态（缺依赖/未配置/无权限），用户可修复，不记为长期规则
 只有否定断言、没有可迁移的做法或具体对象
-缺少可迁移的做法或具体对象（不是一条能照做的规则）
+缺少可迁移的做法或具体对象（不是一条能照做的规则）……门槛就是靠反引号里的东西认出「具体对象」的
+是对这一轮的任务指令（第二人称祈使），不是环境事实
+是一份「我做了什么」的汇报，不是环境事实
+环境事实得给得出具体对象（路径、版本、端点、开关），否则它只是当时的说法
 ```
 
 **读拒收**：`learn action=pending` 列出候选，每条带 `[可写入]` 或 `[未过门槛]`，未过的直接给 `未过原因：…`；`learn action=history name=<技能>` 看某个技能上发生过的写/强化/合并/撤销与拒收（`review.refuse` 在账本里）。
@@ -386,9 +412,11 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 
 ### 两个会静默毁掉激活的陷阱
 
+**先说一条本插件做得不对的地方。** 宿主的插件开发指南写得很直白：「`plugin_manager` `install_bundle` performs package installation and bundle selection; do not reproduce those steps with shell commands」。而本插件目前的安装方式就是**手工拷进 `node_modules` 再手工写 `bundles`**——因为它是本地目录、没发到 npm，`install_bundle` 没有可用的包名可指。这不是「照着文档做」，这是「文档给的路走不通时的临时办法」；一旦发布到 registry，正确的做法是走 `install_bundle`。README 里留着这段自认，是不想让下一个人以为手工拷贝是推荐姿势。
+
 **(a) 对 `@deepseek-ai/dsh-*` 声明任何 `peerDependencies`，整个 bundle 会被跳过。** 宿主的 `evaluatePluginCompatibility` 在兼容性判定里会因此跳过整个 bundle——不报错，就是不激活。所以本插件的 `package.json` **没有 `peerDependencies`**；`@deepseek-ai/dsh-tools` 只是可选导入（`loadDefineTool()` 里 try/catch，拿不到就用普通定义注册工具）。
 
-**(b) 导出一个普通的 `Config` 对象会抛 `TypeError: Cannot read properties of undefined (reading 'validate')`。** Cordis 在调用任何东西之前先读 `runtime.Config["~standard"]`，一个没有 schemastery 的 schema 对象比没有 schema 更糟。所以 `lib/index.js` **故意不导出 `Config`**：没有 schema 时 Cordis 把 patch 层的原始对象交给 `apply`，而 `normalizeConfig()` 已经逐字段校验并夹紧了每个值。
+**(b) 导出一个没有 schemastery 的 `Config` 对象会抛 `TypeError: Cannot read properties of undefined (reading 'validate')`。** Cordis 在调用任何东西之前先读 `runtime.Config["~standard"]`。v0.2.x 的结论是「那就干脆不导出」——理由是成立的，代价却更大：没有 schema，`Config.listConfigs` 看不见这个插件，patch 层也校验不了它，于是**每一个旋钮都从外面够不着**。v0.3.1 改成只在真的能导入 schemastery 时才导出：`export const Config = await loadConfigSchema();`，`loadConfigSchema()` 动态 `import('@deepseek-ai/schemastery')`，然后按 `lib/config.js` 里的 `CONFIG_SHAPE` 这张**纯数据**描述表递归构造 schema（`string[]` → `Schema.array(Schema.string())`，嵌套对象 → `Schema.object(...)`），所以键表只有一份。拿不到库就返回 `undefined`——**一个缺失的 schema 永远不该是致命的**，那正是入口整个死掉的方式。
 
 ### 激活后的自检
 
@@ -449,7 +477,7 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-399/399 checks passed — all green
+546/546 checks passed — all green
 348/348 checks passed
 ```
 
@@ -462,7 +490,7 @@ node scripts/selftest.mjs
 
 | 脚本 | 用途 |
 |---|---|
-| `scripts/selftest.mjs` | 宿主半边：18 节断言，`npm test` |
+| `scripts/selftest.mjs` | 宿主半边：20 节断言，`npm test` |
 | `scripts/client-check.mjs` | 浏览器半边：把 `lib/client.js` 塞进一个假的 `window.__ModuleLoader__`，驱动**真的** `match`/`start`/`update`/`buildLocationData`，再用假的 `jsx` 渲染**真的**组件。它证明的是**折叠逻辑**——哪次调用该留一行、哪次该去重、失败的调用是不是被涂成失败、什么都没发生的回合是不是什么都不发布。它**证明不了外观**：这里没有浏览器，模拟渲染器不能替代真的看一眼 |
 | `scripts/replay-session.mjs` | 把**真实会话重放**给插件：`node scripts/replay-session.mjs --latest 1`。会话文件是一串**逐次追加拼接的 zstd 帧**，`zstdDecompressSync` 只解得出第一帧——脚本按 magic `28 b5 2f fd` 逐帧解再拼。这是最有说服力的验收方式 |
 | `scripts/purge-noise.mjs` | 用**插件自己的** `review.gatesFor()` 重判队列里的每条候选（清理工具不该有自己的质量主张），并合并账本里重复的拒收行。默认 dry-run，`--apply` 才写 |

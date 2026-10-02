@@ -22,16 +22,17 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { Capture } from '../lib/capture.js';
-import { normalizeConfig } from '../lib/config.js';
+import { CONFIG_SHAPE, normalizeConfig } from '../lib/config.js';
 import { createCurator } from '../lib/curator.js';
 import { makeExtractor } from '../lib/extract.js';
 import { createGraph } from '../lib/graph.js';
-import { migrateOwnSkills, optionalSkillsService, probeLearnedRoot } from '../lib/index.js';
+import { DISCIPLINE_SECTION, createHostHooks, guardSkillWrites, isInside, normalizePath, queueNudge } from '../lib/host.js';
+import { migrateOwnSkills, optionalSkillsService, pickSurvivor, probeLearnedRoot } from '../lib/index.js';
 import { createManaged } from '../lib/managed.js';
 import { LEARNED_PROVIDER, LEARNED_RANK, createLearnedProvider, registerLearnedProvider } from '../lib/provider.js';
 import { createReview } from '../lib/review.js';
@@ -43,11 +44,15 @@ import {
   screenStatement,
 } from '../lib/sanitize.js';
 import { createSkills, fitDescription, parseFrontmatter, slugify } from '../lib/skills.js';
-import { createStore } from '../lib/storage.js';
+import { createStore, LEDGER_KEEP_ROTATED, LEDGER_ROTATE_BYTES } from '../lib/storage.js';
 import { createTools } from '../lib/tools.js';
 import {
   SIGNAL,
   SELF_NARRATION_RE,
+  META_DISCUSSION_RE,
+  SHAPE_REFUSALS,
+  TASK_DIRECTIVE_RE,
+  WORK_REPORT_RE,
   classifyText,
   condense,
   desensitize,
@@ -152,6 +157,16 @@ function check(label, condition, extra) {
 
 function eq(label, actual, expected) {
   check(label, actual === expected, { actual, expected });
+}
+
+/**
+ * `eq` is a reference comparison — right for strings and numbers, silently wrong
+ * for arrays and objects, where it fails while printing identical `actual` and
+ * `expected` (which is worse than a plain failure: it looks like the harness is
+ * broken). Anything list-shaped goes through here instead.
+ */
+function sameList(label, actual, expected) {
+  check(label, JSON.stringify(actual) === JSON.stringify(expected), { actual, expected });
 }
 
 function start(title) {
@@ -447,8 +462,55 @@ start('text — the P0-1 regression and the anti-capture gate');
   );
   eq('environment state is refused', env.ok, false);
 
-  eq('desensitize kills a token', /已脱敏/.test(desensitize('Authorization: Bearer sk-abcdefghijklmnopqrstuvwx')), true);
-  eq('desensitize kills an email', /已脱敏/.test(desensitize('mail me at someone@example.com')), true);
+  // The gate's refusals used to be prose and nothing else, so `lib/review.js`
+  // decided its `actionable` gate by matching that prose against
+  // `/可迁移|具体对象/`. Codes replaced the match; this pins the replacement to
+  // the behaviour it replaced, over every refusal shape the gate can produce.
+  // If a refusal is added without a code, or a code is added to `SHAPE_REFUSALS`
+  // that the wording never meant, this is where it shows up.
+  const refusalShapes = [
+    [{ statement: '', kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: '太短', kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: `很长${'x'.repeat(500)}`, kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: '[令牌已脱敏] [邮箱已脱敏] [路径已脱敏]', kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: ": $ErrorActionPreference = 'Stop' # cleanup $env:X = 1 | Out-File", kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: debugMonologue, kind: SIGNAL.REMEMBER_REQUEST }, {}],
+    [{ statement: 'Let me look inside D:\\AI next', kind: SIGNAL.TECHNIQUE }, { source: 'assistant' }],
+    [{ statement: '这条失败还没解决，先放着', kind: SIGNAL.TOOL_FAILURE_OPEN }, {}],
+    [{ statement: '这次先这样，下次再说', kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: '刚才那次删除花了 21.4 秒，然后我确认了三个目标都没了', kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: ': syntax ok\n250/251 checks passed, 1 FAILED', kind: SIGNAL.RECOVERED_FAILURE }, { source: 'auto-tool' }],
+    [{ statement: 'edit: Error: old_string was not found in C:\\Users\\admin\\x.js', kind: SIGNAL.RECOVERED_FAILURE }, { source: 'auto-tool' }],
+    [{ statement: 'bash 跑了一下但什么都没输出', kind: SIGNAL.RECOVERED_FAILURE }, { source: 'auto-tool' }],
+    [{ statement: '这台机器没有装 ffmpeg，需要先安装才能转码', kind: SIGNAL.DURABLE_FACT }, {}],
+    [{ statement: '这个仓库里没有 CI，也不要加', kind: SIGNAL.TECHNIQUE }, {}],
+    [{ statement: 'You are writing ONE new file and nothing else.', kind: SIGNAL.DURABLE_FACT }, { source: 'user' }],
+    [{ statement: '这个仓库的构建方式跟别的地方不太一样', kind: SIGNAL.DURABLE_FACT }, { source: 'user' }],
+    [{ statement: '记住了，以后都这样', kind: SIGNAL.TECHNIQUE }, {}],
+  ];
+  let comparedCodes = 0;
+  let sawRefusal = false;
+  for (const [observation, options] of refusalShapes) {
+    const gate = gateObservation(observation, options);
+    eq('every refusal carries a code', gate.codes.length, gate.reasons.length);
+    if (!gate.ok) sawRefusal = true;
+    // The code path and the string path must agree, refusal for refusal.
+    eq(
+      `codes reproduce the old wording match — ${String(observation.kind)} "${condense(observation.statement, { maxChars: 24 })}"`,
+      !gate.codes.some((code) => SHAPE_REFUSALS.has(code)),
+      gate.reasons.every((reason) => !/可迁移|具体对象/.test(reason)),
+    );
+    comparedCodes += 1;
+  }
+  eq('the equivalence was actually exercised', comparedCodes, refusalShapes.length);
+  check('and at least one shape really was refused', sawRefusal);
+  eq(
+    'a shape refusal is reported by code, not by wording',
+    gateObservation({ statement: ': $a = 1 | Out-File x', kind: SIGNAL.TECHNIQUE }, {}).codes.includes('command-dump'),
+    true,
+  );
+
+  eq('desensitize kills a token', /已脱敏/.test(desensitize('Authorization: Bearer sk-abcdefghijklmnopqrstuvwx')), true);  eq('desensitize kills an email', /已脱敏/.test(desensitize('mail me at someone@example.com')), true);
   eq('mostly-redacted text is detectable', isMostlyRedacted('[令牌已脱敏] [邮箱已脱敏]'), true);
   eq('one-off detection', looksOneOff('这次先这样吧，下次再说'), true);
   check('condense keeps one line', !condense('a\n\nb').includes('\n'));
@@ -480,8 +542,111 @@ start('regression — the false positives the LIVE run actually produced');
     );
   }
 
-  const script = ": $ErrorActionPreference = 'Stop' # Remove the DeepSeek integration from Codex. $CodexHome = Join-Path $env:USERPROFILE '.codex' $ConfigPath = Join-Path $CodexHome 'config.toml'";
-  eq('a command dump is recognised', looksLikeCommandDump(script), true);
+  // Round three. These two were STILL passing every gate AFTER the v0.3.0 gate
+  // work — re-judged against the shipped code with the real queue in hand. Both
+  // are kept verbatim for the same reason as the list above.
+  const liveSurvivors = [
+    {
+      label: "someone else's one-off task instruction",
+      statement:
+        'You are writing ONE new file and nothing else. Do not edit any other file in the repo; do not touch the existing tests.',
+      kind: 'DURABLE_FACT',
+      source: 'user',
+      reason: /第二人称|任务指令/,
+    },
+    {
+      label: "the agent quoting the plugin's own internals",
+      statement:
+        'Now I understand `isActionable`: - `PROCEDURAL_RE` needs: 先/然后/接着/再/最后 … 再/然后/最后/即可/就能; OR a verb within 30 chars of a noun.',
+      kind: 'TECHNIQUE',
+      source: 'assistant',
+      reason: /过程叙述|插件自身/,
+    },
+    // Round four, and this one was found by RUNNING the purge tool rather than by
+    // reading the gate: it survived the two fixes above and was one `--apply` away
+    // from becoming a permanent "environment fact".
+    {
+      label: "a report of work already done",
+      statement:
+        '最终审查完成。这轮我把 v0.3.0 的 16 个模块 + 浏览器半边 + 脚本全读了，**亲手跑了它的两套测试、在沙箱里复现了一个数据丢失 bug**，并且把宿主自己的插件开发指南挖了出来。',
+      kind: 'DURABLE_FACT',
+      source: 'user',
+      reason: /汇报/,
+    },
+  ];
+  for (const item of liveSurvivors) {
+    const gate = gateObservation({ statement: item.statement, kind: item.kind, resolved: true }, { source: item.source });
+    eq(`live survivor — ${item.label} is refused`, gate.ok, false);
+    check(
+      `live survivor — ${item.label} is refused for the right reason`,
+      gate.reasons.some((reason) => item.reason.test(reason)),
+      gate.reasons,
+    );
+  }
+  // `META_DISCUSSION_RE` is the predicate that has to see it, so pin the predicate
+  // itself: the gate could start refusing for an unrelated reason and the check
+  // above would never notice.
+  eq(
+    'quoting the plugin\'s internals is meta-discussion',
+    META_DISCUSSION_RE.test(liveSurvivors[1].statement),
+    true,
+  );
+  eq(
+    'a second-person imperative is a task directive',
+    TASK_DIRECTIVE_RE.test(liveSurvivors[0].statement),
+    true,
+  );
+  eq(
+    'a first-person account of finished work is a work report',
+    WORK_REPORT_RE.test(liveSurvivors[2].statement),
+    true,
+  );
+  // The overshoot controls, and the reason both fixes are keyed on `kind` rather
+  // than applied to everything:
+  check(
+    'a real environment fact with a concrete object still passes',
+    gateObservation(
+      { statement: '这台机器上 Python 在 `C:\\Users\\admin\\.dsh\\dsh-runtimes\\dsh-primary-runtime\\dependencies\\python\\python.exe`，`python` 不在 PATH 里', kind: 'DURABLE_FACT', resolved: true },
+      { source: 'user' },
+    ).ok,
+  );
+  check(
+    'but a fact that names nothing specific does not',
+    !gateObservation({ statement: '这个仓库的构建方式跟别的地方不太一样，得注意一下', kind: 'DURABLE_FACT', resolved: true }, { source: 'user' }).ok,
+  );
+  check(
+    'a user preference is untouched by the durable-fact rule',
+    gateObservation({ statement: '以后都用中文回复我，除非我明确要求英文', kind: 'USER_PREFERENCE', resolved: true }, { source: 'user' }).ok,
+  );
+  eq(
+    'and the task-directive rule is scoped to DURABLE_FACT alone',
+    gateObservation({ statement: liveSurvivors[0].statement, kind: 'USER_PREFERENCE', resolved: true }, { source: 'user' }).ok,
+    true,
+  );
+  eq(
+    'and the work-report rule is scoped to DURABLE_FACT alone',
+    gateObservation({ statement: liveSurvivors[2].statement, kind: 'TECHNIQUE', resolved: true }, { source: 'user' }).ok,
+    true,
+  );
+  // The overshoot control for the work-report rule: an environment fact that
+  // happens to contain a completion verb somewhere must still pass, which is why
+  // the regex wants first person AND a reading/running verb, not just 「完成」.
+  // (The first draft of this fixture said 「这次调用」 and was refused as `one-off`
+  // — a real refusal, just not the one under test. A control that fails for an
+  // unrelated reason proves nothing about the rule it is controlling.)
+  check(
+    'a fact that merely mentions something finishing still passes',
+    gateObservation(
+      {
+        statement: '`tools/pre-execute` 是在工具真正执行之前触发的水位监听，多个监听器按注册顺序依次执行，任何一层返回拒绝都会让调用结束',
+        kind: 'DURABLE_FACT',
+        resolved: true,
+      },
+      { source: 'user' },
+    ).ok,
+  );
+
+  const script = ": $ErrorActionPreference = 'Stop' # Remove the DeepSeek integration from Codex. $CodexHome = Join-Path $env:USERPROFILE '.codex' $ConfigPath = Join-Path $CodexHome 'config.toml'";  eq('a command dump is recognised', looksLikeCommandDump(script), true);
   eq(
     'a command dump is refused even as a tool observation',
     gateObservation({ statement: script, kind: 'TECHNIQUE', resolved: true }, { source: 'auto-tool' }).ok,
@@ -840,6 +1005,24 @@ start('review — propose, promote, reinforce, consolidate, undo');
     'doctor notices the root is not registered with the host',
     doctor.checks.some((entry) => entry.id === 'host-root' && entry.ok === false),
   );
+  // The host extension points are reported only when the caller passes them —
+  // `doctor()` is also called from the self-test and from scripts with no host at
+  // all, and a check that cannot be answered must be absent rather than invented.
+  check(
+    'doctor says nothing about host hooks when it was not told',
+    !doctor.checks.some((entry) => entry.id === 'host-hooks'),
+  );
+  const hooked = (hostHooks) => review.doctor({ customRoots: [], hostHooks }).checks.find((entry) => entry.id === 'host-hooks') || {};
+  const allHooks = hooked({ applied: ['systemPrompt.section', 'systemPrompt.section(queue)', 'tools.guard'] });
+  eq('doctor reports the hooks that really registered', allHooks.ok, true);
+  check('and names them', /tools\.guard/.test(String(allHooks.detail)), allHooks.detail);
+  // The one hook that is load-bearing: without the guard, the discipline
+  // section's 「技能是唯一被校验的写入口」 is a sentence the plugin cannot back.
+  const noGuard = hooked({ applied: ['systemPrompt.section'] });
+  eq('a missing guard is a fault, not a note', noGuard.ok, false);
+  check('and the fault says what is no longer true', /learn_skill_manage|拦不住/.test(String(noGuard.detail)), noGuard.detail);
+  eq('nothing registered at all is also a fault', hooked({ applied: [], reason: '宿主没有提供 systemPrompt' }).ok, false);
+  check('and it repeats the host\'s own reason', /宿主没有提供 systemPrompt/.test(String(hooked({ applied: [], reason: '宿主没有提供 systemPrompt' }).detail)));
 
   // `legacy` is positional (anything outside the dedicated root), so a
   // hand-written skill is indistinguishable from our own leftover by path
@@ -1415,13 +1598,21 @@ start('migration — nothing moves until the host can see the folder');
   eq('the migration is in the ledger', store.readLedger().some((row) => row.action === 'skill.migrate'), true);
 }
 
-start('migration — a stale shared-root copy cannot shadow the dedicated one');
+start('migration — a duplicate is judged by content and mtime, never by location');
 {
+  // v0.3.0 answered this question with "the dedicated root is authoritative" and
+  // deleted the shared-root copy unconditionally. That is correct exactly once —
+  // after the activation window. During it, the shared root is where a not-yet-live
+  // plugin writes, so the "stale duplicate" was regularly the freshest text in the
+  // system: every start reverted the plugin's own instructions. Both directions are
+  // pinned below, because a test that only ever makes the dedicated copy newer
+  // passes either way and proves nothing.
+
+  // --- direction 1: the dedicated copy is newer, so it survives ---
   const home = makeHome('shadow');
   const { skills, managed, store } = makeWorld(home);
   skills.setLive(true);
   const version = (body) => `---\nname: self-learning-loop\ndescription: d\n---\n\n## 规则\n\n- 旧：${body} <!-- r:aa -->\n`;
-  // Both copies exist: the v0.1.0 leftover in the shared root and the live one.
   // Paths are spelled out rather than derived, so the fixture cannot be fooled by
   // whichever location the resolver happens to prefer.
   const flatCopy = join(home, 'skills', 'self-learning-loop', 'SKILL.md');
@@ -1430,13 +1621,67 @@ start('migration — a stale shared-root copy cannot shadow the dedicated one');
   writeFileSync(flatCopy, version('flat'), 'utf8');
   mkdirSync(dirname(learnedCopy), { recursive: true });
   writeFileSync(learnedCopy, version('learned'), 'utf8');
+  utimesSync(flatCopy, new Date('2026-01-01T00:00:00Z'), new Date('2026-01-01T00:00:00Z'));
+  utimesSync(learnedCopy, new Date('2026-06-01T00:00:00Z'), new Date('2026-06-01T00:00:00Z'));
   managed.claim('self-learning-loop', { kind: 'self', source: 'activation' });
 
   const settled = migrateOwnSkills({ skills, managed, store });
   eq('the duplicate is pruned', settled.pruned, 1);
   eq('the shared-root copy is gone', existsSync(dirname(flatCopy)), false);
-  check('the dedicated copy survives', readFileSync(learnedCopy, 'utf8').includes('learned'));
+  check('the newer dedicated copy survives', readFileSync(learnedCopy, 'utf8').includes('learned'));
   eq('reads resolve to the dedicated copy', skills.locate('self-learning-loop').root, skills.learnedDir);
+  const dedupe = store.readLedger().filter((row) => row.action === 'skill.dedupe').pop();
+  check('the dedupe is in the ledger with its reason', Boolean(dedupe) && dedupe.kept === 'learned' && dedupe.why.length > 0, dedupe);
+  check('the ledger says which copy was dropped', String(dedupe?.dropped || '').includes('skills'), dedupe?.dropped);
+
+  // --- direction 2 (THE P0): the shared copy is newer, so IT survives ---
+  const home2 = makeHome('shadow-p0');
+  const world2 = makeWorld(home2);
+  world2.skills.setLive(true);
+  const flat2 = join(home2, 'skills', 'self-learning-loop', 'SKILL.md');
+  const learned2 = join(world2.skills.learnedDir, 'self-learning-loop', 'SKILL.md');
+  mkdirSync(dirname(flat2), { recursive: true });
+  mkdirSync(dirname(learned2), { recursive: true });
+  // The exact shape a start produced: the OLD text in the dedicated root (mtime from
+  // an earlier boot) and the text just written to the shared root during activation.
+  writeFileSync(learned2, version('OLD'), 'utf8');
+  writeFileSync(flat2, version('FRESH'), 'utf8');
+  utimesSync(learned2, new Date('2026-01-01T00:00:00Z'), new Date('2026-01-01T00:00:00Z'));
+  utimesSync(flat2, new Date('2026-06-01T00:00:00Z'), new Date('2026-06-01T00:00:00Z'));
+  world2.managed.claim('self-learning-loop', { kind: 'self', source: 'activation' });
+
+  const verdict = pickSurvivor(world2.skills.copies('self-learning-loop'));
+  eq('the fresher shared copy wins the judgment', verdict.keep, 'flat');
+  const settled2 = migrateOwnSkills({ skills: world2.skills, managed: world2.managed, store: world2.store });
+  eq('the fresher copy is not counted as pruned', settled2.pruned, 1);
+  eq('the shared-root copy is gone (it moved, it did not vanish)', existsSync(dirname(flat2)), false);
+  check('THE P0: the freshly written text is what survives', readFileSync(learned2, 'utf8').includes('FRESH'));
+  eq('and the stale text is what died', readFileSync(learned2, 'utf8').includes('OLD'), false);
+  eq('reads still resolve to the dedicated copy', world2.skills.locate('self-learning-loop').root, world2.skills.learnedDir);
+  eq('the skill is still readable by name afterwards', Boolean(world2.skills.read('self-learning-loop')), true);
+
+  // --- direction 3: a write during the activation window does not create a duplicate at all ---
+  const home3 = makeHome('write-target');
+  const world3 = makeWorld(home3);
+  // The skill lives in the shared root and the probe has not answered yet. `write()`
+  // must follow the skill, not `activeRoot()` — otherwise this very call is what
+  // manufactures the duplicate that the migration then has to adjudicate.
+  mkdirSync(join(home3, 'skills', 'self-learning-loop'), { recursive: true });
+  writeFileSync(join(home3, 'skills', 'self-learning-loop', 'SKILL.md'), version('old'), 'utf8');
+  eq('the dedicated root is unproven', world3.skills.isLive(), false);
+  const during = world3.skills.write('self-learning-loop', { description: 'd', body: version('just-written'), meta: {} });
+  eq('the write succeeds', during.ok, true);
+  check('it landed beside the existing copy, not in the unproven root', during.file.includes(join('skills', 'self-learning-loop')));
+  eq('no duplicate was manufactured', world3.skills.copies('self-learning-loop').learned, null);
+  eq('the write is what is on disk', world3.skills.read('self-learning-loop').body.includes('just-written'), true);
+
+  // And the same write after a successful probe follows the skill into the dedicated root.
+  world3.skills.setLive(true);
+  const settled3 = migrateOwnSkills({ skills: world3.skills, managed: world3.managed, store: world3.store });
+  eq('the lone copy moves once the root is proven', settled3.moved, 1);
+  check('and it carries the fresh text with it', world3.skills.read('self-learning-loop').body.includes('just-written'));
+  const after = world3.skills.write('self-learning-loop', { description: 'd', body: version('after-live'), meta: {} });
+  eq('a later write targets the proven root', dirname(after.file), join(world3.skills.learnedDir, 'self-learning-loop'));
 }
 
 // ============================================================ 11. skillfile
@@ -1465,6 +1710,99 @@ start('skillfile — the always-on skill file');
   const desc = fitDescription(DEFAULT_SKILL_DESCRIPTION);
   eq('fitDescription does not clip a 500-char budget', desc.clipped, false);
   eq('fitDescription reports the limit it used', desc.limit, 500);
+}
+
+// ============================================================ 13. ledger
+
+start('ledger — real hit counts, a bounded tail, and rotation that keeps its record');
+{
+  const home = makeHome('ledger');
+  const { store, review } = makeWorld(home);
+
+  // ---- the sidecar: what makes `novel` answerable without reading the ledger
+  const RULE = '有效做法：先跑 `node --check` 再提交，能提前发现语法错误';
+  const firstWrite = review.remember({ statement: RULE, kind: SIGNAL.TECHNIQUE, session: 's1' });
+  eq('a rule is written', firstWrite.ok, true);
+  check('the sidecar exists', existsSync(store.files.seen), store.files.seen);
+  check('the sidecar holds the rule just written', store.seenFingerprints().has(fingerprint(RULE)));
+
+  // `novel` reported `true` unconditionally until this round: the doctor printed
+  // `novel=ok` for every candidate ever judged, its own duplicates included.
+  const dup = review.propose({ statement: RULE, kind: SIGNAL.TECHNIQUE, session: 's1' });
+  eq('a candidate that is already a rule is refused', dup.ok, false);
+  check(
+    'and it is the novelty gate that refuses it',
+    dup.checks.some((entry) => entry.id === 'novel' && entry.ok === false),
+    dup.checks,
+  );
+
+  // `remember` must NOT check novelty: "already a rule" is the case it handles by
+  // REINFORCING, so refusing there would silently drop a real repeat. This is the
+  // bug the first wiring attempt caused at selftest.mjs:948.
+  const reinforced = review.remember({ statement: RULE, kind: SIGNAL.TECHNIQUE, session: 's2' });
+  eq('remember still reinforces rather than refuses', reinforced.reinforced, true);
+
+  // ---- hits are counted, not asserted. The old code returned a literal `hits: 2`
+  // for the second reinforcement and for every one after it.
+  const hits = [reinforced.hits];
+  for (let i = 0; i < 4; i += 1) {
+    const more = review.remember({ statement: RULE, kind: SIGNAL.TECHNIQUE, session: `s${i}` });
+    eq(`reinforcement ${i + 2} reinforces rather than adds a twin`, more.reinforced, true);
+    hits.push(more.hits);
+  }
+  eq('hits count the real reinforcements, not a constant', hits.join(','), '1,2,3,4,5');
+
+  // ---- rotation: a ledger that grows without bound is a ledger nothing reads
+  const filler = (count) =>
+    `${Array.from({ length: count }, (_, i) => JSON.stringify({ action: 'filler', n: i, pad: 'x'.repeat(700) })).join('\n')}\n`;
+  const rotations = () => readdirSync(store.dirs.root).filter((name) => /^ledger-\d{8}-[a-z0-9]+\.jsonl$/.test(name));
+
+  writeFileSync(store.files.ledger, filler(3200), 'utf8');
+  check('the filler really is over the rotation threshold', statSync(store.files.ledger).size >= LEDGER_ROTATE_BYTES);
+  store.appendLedger({ action: 'probe' });
+  eq('the ledger rotates once it is over the threshold', rotations().length, 1);
+  eq('and the fresh ledger holds only what came after', store.readLedger().length, 1);
+  check('the rotated file is the old content, not a copy of the new', readFileSync(join(store.dirs.root, rotations()[0]), 'utf8').includes('"filler"'));
+
+  for (let i = 0; i < 5; i += 1) writeFileSync(join(store.dirs.root, `ledger-2026010${i}-pad${i}.jsonl`), '{}\n', 'utf8');
+  writeFileSync(store.files.ledger, filler(3200), 'utf8');
+  store.appendLedger({ action: 'probe2' });
+  eq('old rotations are pruned down to the newest few', rotations().length, LEDGER_KEEP_ROTATED);
+
+  // ---- the tail is what a bounded read is for. A rotation leaves ONE row behind,
+  // so the tail is measured after adding rows that are actually there.
+  store.appendLedger({ action: 'tail-a' });
+  store.appendLedger({ action: 'tail-b' });
+  store.appendLedger({ action: 'tail-c' });
+  const tail = store.readLedger({ limit: 2 });
+  eq('a limited read returns only the tail', tail.length, 2);
+  eq('the limit takes the tail, not the head', tail[0].action, 'tail-b');
+  eq('and the tail ends at the newest row', tail[tail.length - 1].action, 'tail-c');
+
+  // ---- the `review.propose` row used to embed every filed proposal and every
+  // skipped statement; rows of that shape were 78% of an 857KB ledger in 23 hours.
+  const world = makeWorld(makeHome('ledger-row'));
+  world.capture.recordUserMessage('r1', '记住：以后都用 pnpm，不要用 npm', {});
+  world.capture.recordToolResult('r1', {
+    tool: 'bash',
+    failed: true,
+    content: 'bash: pnpm: command not found —— 这台机器上 npm 和 pnpm 装出来的树不一样，混用会锁死',
+    args: { command: 'pnpm install' },
+  });
+  world.review.runReview('r1', { dryRun: false, minWeight: 1 });
+  const row = world.store.readLedger({ limit: 50 }).filter((entry) => entry.action === 'review.propose').pop();
+  check('a review run leaves a propose row', Boolean(row), row);
+  check(
+    'the row records counts, not the roster',
+    typeof row?.filedCount === 'number' && typeof row?.skippedCount === 'number',
+    row,
+  );
+  check('and only samples', (row?.filed || []).length <= 5 && (row?.skipped || []).length <= 5, row);
+  check(
+    'the row is small enough that 78% of a ledger cannot be these again',
+    JSON.stringify(row).length < 1200,
+    JSON.stringify(row).length,
+  );
 }
 
 // ============================================================ 12. repair
@@ -1524,6 +1862,179 @@ start('config — every knob has a reader');
   eq('review.ruleBudget is wired', readers('config.review', 'ruleBudget').includes('review.js'), true);
   eq('review.similarity is wired', readers('config.review', 'similarity').includes('review.js'), true);
   eq('review.maxProposals is wired', readers('config.review', 'maxProposals').includes('review.js'), true);
+
+  // The schema the HOST sees and the object `normalizeConfig` returns are two
+  // views of one table, and they may drift in exactly one direction: never.
+  // `loadConfigSchema` in index.js walks CONFIG_SHAPE instead of repeating it,
+  // so this is the assertion that keeps the walk honest — and it has to run on a
+  // machine where schemastery is not installed at all (this one), which is
+  // precisely why the shape is plain data rather than a schema object.
+  const shapeLeaves = [];
+  const walkShape = (node, prefix = '') => {
+    for (const [key, spec] of Object.entries(node)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (spec && typeof spec === 'object' && !spec.type) walkShape(spec, path);
+      else shapeLeaves.push(path);
+    }
+  };
+  walkShape(CONFIG_SHAPE);
+  const configLeaves = [];
+  for (const [key, value] of Object.entries(config)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const leaf of Object.keys(value)) configLeaves.push(`${key}.${leaf}`);
+    } else {
+      configLeaves.push(key);
+    }
+  }
+  // `eq` is a reference comparison, so arrays are compared by value here.
+  sameList(
+    'CONFIG_SHAPE covers every key normalizeConfig returns',
+    configLeaves.filter((key) => !shapeLeaves.includes(key)),
+    [],
+  );
+  sameList(
+    'CONFIG_SHAPE invents no key normalizeConfig does not return',
+    shapeLeaves.filter((key) => !configLeaves.includes(key)),
+    [],
+  );
+  const untyped = [];
+  for (const [key, spec] of Object.entries(CONFIG_SHAPE)) {
+    if (spec && typeof spec === 'object' && !spec.type) {
+      for (const [leaf, inner] of Object.entries(spec)) if (!inner?.type) untyped.push(`${key}.${leaf}`);
+    } else if (!spec?.type) {
+      untyped.push(key);
+    }
+  }
+  // An untyped entry silently becomes `Schema.string()` in the walk above, so a
+  // missing type is a knob the host would present as text.
+  sameList('every CONFIG_SHAPE entry declares a type', untyped, []);
+  sameList(
+    'the shape types are all ones the walk understands',
+    [
+      ...new Set(
+        shapeLeaves.map((path) => {
+          let node = CONFIG_SHAPE;
+          for (const part of path.split('.')) node = node[part];
+          return node.type;
+        }),
+      ),
+    ].filter((type) => !['string', 'number', 'boolean', 'string[]'].includes(type)),
+    [],
+  );
+}
+
+start('host — the guard refuses the wrong door and the nudge stays quiet when there is nothing to say');
+{
+  // The audit's finding was that the model can `edit` a SKILL.md directly and
+  // bypass every check the plugin has. The guard closes that door — and the
+  // interesting half of the test is that it does NOT close any other: a guard is
+  // monotonic, so a false positive is not a nuisance, it is a tool the model
+  // cannot use at all.
+  const home = makeHome('host-hooks');
+  const { skills, managed, store } = makeWorld(home);
+  const learned = skills.learnedDir;
+  const flat = join(home, 'skills');
+  managed.claim('mine', { kind: 'umbrella', source: 'test', file: join(flat, 'mine', 'SKILL.md') });
+
+  const denies = (name, args) => guardSkillWrites({ name, arguments: args }, { skills, managed });
+  const allows = (name, args) => denies(name, args) === undefined;
+
+  // Doors that must be shut.
+  check('write into the dedicated root is refused', typeof denies('write', { file_path: join(learned, 'x', 'SKILL.md') }) === 'string');
+  check('edit into the dedicated root is refused', typeof denies('edit', { file_path: join(learned, 'x', 'SKILL.md') }) === 'string');
+  check('a skill this plugin owns is refused in the shared root too', typeof denies('write', { file_path: join(flat, 'mine', 'SKILL.md') }) === 'string');
+  check('so is a built-in', typeof denies('write', { file_path: join(flat, 'durable-preferences', 'SKILL.md') }) === 'string');
+  check('a trailing separator does not slip past', typeof denies('write', { file_path: `${learned}\\` }) === 'string');
+  // Climb out and back in: the raw string starts with the root, so a naive
+  // prefix check denies it — and a naive prefix check is also what a `..` can be
+  // used to argue PAST. Normalisation has to happen before the comparison, in
+  // both directions.
+  check(
+    'climbing out and back in is still the same door',
+    typeof denies('write', { file_path: `${learned}/x/../../learned/x/SKILL.md` }) === 'string',
+  );
+  check(
+    'a path that genuinely leaves the skill library is not ours to police',
+    allows('write', { file_path: join(learned, '..', '..', 'elsewhere', 'SKILL.md') }),
+  );
+  // The refusal has to carry the way through, or it is just a wall.
+  check('the refusal names the sanctioned tool', denies('write', { file_path: join(learned, 'x', 'SKILL.md') }).includes('learn_skill_manage'));
+
+  // Doors that must stay open.
+  check('write elsewhere is untouched', allows('write', { file_path: join(home, 'notes.md') }));
+  check('edit elsewhere is untouched', allows('edit', { file_path: join(home, 'src', 'thing.js') }));
+  check('a sibling directory sharing a prefix is NOT inside', allows('write', { file_path: `${learned}-old/SKILL.md` }));
+  check('a read of a skill file is untouched (the guard only sees write/edit)', allows('read', { file_path: join(learned, 'x', 'SKILL.md') }));
+  check('pwsh is not blanket-blocked', allows('pwsh', { command: 'Get-ChildItem' }));
+  check('a write with no path is not guessed at', allows('write', {}));
+  check('a non-string path is not guessed at', allows('write', { file_path: 42 }));
+  // The shared root holds other people's skills. Refusing those would be this
+  // plugin forbidding edits to files it does not own.
+  check("someone else's skill in the shared root is not ours to block", allows('write', { file_path: join(flat, 'zz-user-probe', 'SKILL.md') }));
+
+  // isInside, on its own: the whole guard rests on this being exact.
+  eq('a child is inside', isInside(join(learned, 'a', 'b.md'), learned), true);
+  eq('the root itself is inside', isInside(learned, learned), true);
+  eq('case does not matter on a drive path', isInside(learned.toUpperCase(), learned), true);
+  eq('a prefix-sharing sibling is outside', isInside(`${learned}-old/x`, learned), false);
+  eq('a parent is outside', isInside(dirname(learned), learned), false);
+  eq('empty arguments are outside everything', isInside('', learned), false);
+
+  // The nudge: silent when there is nothing to say, and it must name the fp —
+  // an instruction to run `restore-pending fp=<...>` with no fp in sight is a
+  // worse prompt than no instruction.
+  eq('an empty queue adds nothing to the prompt', queueNudge([]), '');
+  eq('a missing queue adds nothing either', queueNudge(undefined), '');
+  const nudged = queueNudge([
+    { fp: 'abc123', umbrella: 'tool-recovery', statement: '先跑 node --check 再提交，能提前发现语法错误' },
+  ]);
+  check('the nudge counts what is waiting', /有 1 条候选/.test(nudged));
+  check('the nudge hands over the fp', nudged.includes('fp=abc123'));
+  check('the nudge names both ways out', nudged.includes('restore-pending') && nudged.includes('drop-pending'));
+  const many = queueNudge(Array.from({ length: 9 }, (_, i) => ({ fp: `f${i}`, umbrella: 'u', statement: 's' })));
+  check('a long queue is summarised, not dumped', many.includes('还有 4 条'));
+  eq('the nudge does not leak the whole queue', many.split('\n').filter((line) => line.startsWith('· ')).length, 5);
+
+  // Registration is optional and reported honestly: with no host services at
+  // all this must return an empty `applied` rather than throw, because a missing
+  // extension point degrades to "one safety net absent", never "plugin dead".
+  const bare = createHostHooks({ ctx: { get: () => undefined }, skills, store });
+  sameList('a host without the services applies nothing', bare.applied, []);
+  check('and says so instead of claiming success', /没有提供/.test(bare.reason));
+
+  // With both services present, all three hooks register and dispose cleanly.
+  const disposed = [];
+  const specs = [];
+  const fakeCtx = {
+    get(name) {
+      if (name === 'systemPrompt') {
+        return {
+          section(spec) {
+            specs.push(spec);
+            return () => disposed.push(spec.name);
+          },
+        };
+      }
+      if (name === 'tools') return { guard: () => () => disposed.push('guard') };
+      return undefined;
+    },
+  };
+  const wired = createHostHooks({ ctx: fakeCtx, skills, managed, store, pendingOf: () => [] });
+  sameList('both prompt sections and the guard register', wired.applied, [
+    'systemPrompt.section',
+    'systemPrompt.section(queue)',
+    'tools.guard',
+  ]);
+  sameList('exactly two sections reach the host', specs.map((spec) => spec.name), ['learn-discipline', 'learn-queue']);
+  eq('the discipline section is byte-stable text', typeof specs[0].text, 'string');
+  eq('and declares no interpolation', specs[0].interpolate, false);
+  eq('the discipline section is registered once, not per turn', specs[0].text, DISCIPLINE_SECTION);
+  eq('the queue section is a function so it can be empty', typeof specs[1].text, 'function');
+  eq('with nothing queued it contributes nothing', specs[1].text(), '');
+  check('the discipline section states the refusals', /不值得写的/.test(DISCIPLINE_SECTION));
+  check('and the backtick rule that the gate actually enforces', /反引号/.test(DISCIPLINE_SECTION));
+  wired.dispose();
+  sameList('disposal reaches every registration', disposed.sort(), ['guard', 'learn-discipline', 'learn-queue']);
 }
 
 start('repair — real signatures parse');

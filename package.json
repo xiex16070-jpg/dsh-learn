@@ -1,6 +1,6 @@
 {
   "name": "dsh-learn",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Persistent learning for DSH: post-turn review turns a session's corrections, failures and fixes into reusable skills; an idle curator keeps the learned library healthy; a per-turn recap shows what was written; every lesson keeps its provenance.",
   "type": "module",
   "main": "lib/index.js",
@@ -36,6 +36,7 @@
       ]
     }
   },
+  "icon": "icon.svg",
   "files": [
     "lib",
     "scripts/selftest.mjs",
@@ -44,7 +45,7 @@
     "scripts/purge-noise.mjs",
     "docs/shots/*.png",
     "cordis.patch.yml",
-    "screenshots.json",
+    "icon.svg",
     "README.md",
     "LICENSE"
   ],

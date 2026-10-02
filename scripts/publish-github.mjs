@@ -39,7 +39,7 @@ const INCLUDE = [
   'README.md',
   'cordis.patch.yml',
   'package.json',
-  'screenshots.json',
+  'icon.svg',
   'docs/make-shots.py',
 ];
 

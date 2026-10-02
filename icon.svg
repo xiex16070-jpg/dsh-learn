@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="dsh-learn">
+  <!--
+    Three notes going in, one rule coming out. Deliberately plain geometry: an
+    icon is read at 32px, where a clever mark is just a smudge.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b9bff"/>
+      <stop offset="1" stop-color="#2b62c4"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#bg)"/>
+  <circle cx="20" cy="18" r="3.2" fill="#ffffff" opacity="0.40"/>
+  <circle cx="32" cy="15" r="3.2" fill="#ffffff" opacity="0.70"/>
+  <circle cx="44" cy="18" r="3.2" fill="#ffffff" opacity="0.40"/>
+  <path d="M17 36.5 27 46.5 47.5 24" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -23,6 +23,8 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 
 import { normalizeConfig } from '../lib/config.js';
+import { createManaged } from '../lib/managed.js';
+import { createSkills } from '../lib/skills.js';
 import { createStore } from '../lib/storage.js';
 import { createReview } from '../lib/review.js';
 
@@ -45,11 +47,27 @@ const raw = store.loadPending();
 const items = Array.isArray(raw) ? raw : (raw && raw.items) || [];
 const noisy = [];
 
+// Real services, not stubs. This script's whole argument is that it re-uses the
+// plugin's own gates instead of holding its own opinion — and the first version
+// proved the point by crashing: it hand-wrote a `skills` double with `list` and
+// `readRules` but no `exists`, which was harmless only for as long as the `novel`
+// gate was hardcoded to `true` (review.js, the v0.3.0 placebo). The moment
+// `novel` started calling `allRules()` for real, the purge tool died with
+// `TypeError: skills.exists is not a function` — a tool that had never been run
+// against a working gate. A double that can drift from the interface it is
+// doubling is not a shortcut, it is a second definition of the interface.
+const skills = createSkills({
+  root: config.skillsRoot,
+  legacyRoot: config.legacySkillsRoot,
+  protectedNames: config.curator.pinned,
+});
+const managed = createManaged({ store });
+
 const probe = createReview({
   config,
   store,
-  skills: { list: () => [], readRules: () => [], root: '', learnedDir: '' },
-  managed: { isManaged: () => false, isProtected: () => false, names: () => [] },
+  skills,
+  managed,
   curator: { touch: () => {} },
   logger: console,
   capture: null,
