@@ -69,6 +69,8 @@ import {
   looksTransientToolError,
   looksOneOff,
   tokenize,
+  ACTIONABLE_MAX_CHARS,
+  hasConcreteDetail,
 } from '../lib/text.js';
 import { DEFAULT_SKILL_DESCRIPTION, DEFAULT_SKILL_NAME, defaultSkillText } from '../lib/skillfile.js';
 
@@ -447,6 +449,34 @@ start('text — the P0-1 regression and the anti-capture gate');
     bareRefusal.reasons.some((reason) => reason.includes('反引号')),
     bareRefusal.reasons,
   );
+
+  // THE SAME BUG ONE LEVEL DEEPER. Filing a 217-character durable fact that was
+  // FULL of backticked paths was refused with the "缺少具体对象" sentence above.
+  // The handles were there; the text was over the length cap that `isActionable`
+  // applies to the concrete-detail branch. A model reading that message would add
+  // more backticks forever, so the refusal has to say which of the two it is.
+  const longButConcrete = 'awesome-dsh-plugin 收录规则（来自 `contributing.md`）：条目文件只能有一个，路径是 `data/plugins/<owner>__<repo>.yml`；允许的键只有 `url`、`name`、`category`、`description`、`tarball`、`file`；`description.en` 必填、单行、以句号结尾；值里含 `: ` 必须加引号，否则 YAML 会解析成嵌套键。';
+  eq('a long statement full of concrete objects is still refused', isActionable(longButConcrete, SIGNAL.DURABLE_FACT), false);
+  check('and it really does carry concrete objects', hasConcreteDetail(longButConcrete), longButConcrete.length);
+  check('and it is over the length cap, not under it', longButConcrete.length > ACTIONABLE_MAX_CHARS, longButConcrete.length);
+  const longRefusal = gateObservation(
+    { statement: longButConcrete, kind: SIGNAL.DURABLE_FACT },
+    { maxChars: 400, source: 'note' },
+  );
+  check(
+    'the refusal blames the length, never a missing object',
+    longRefusal.reasons.some((reason) => reason.includes(String(ACTIONABLE_MAX_CHARS)) && reason.includes('太长')),
+    longRefusal.reasons,
+  );
+  check(
+    'and it does not tell the writer to add backticks they already have',
+    !longRefusal.reasons.some((reason) => reason.includes('缺少可迁移的做法或具体对象')),
+    longRefusal.reasons,
+  );
+  // The number in the message is the number in the check, by construction.
+  const shortConcrete = '把 \`node --check lib/text.js\` 放在提交之前跑，能提前发现语法错误';
+  eq('a concrete statement under the cap still passes', isActionable(shortConcrete, SIGNAL.TECHNIQUE), true);
+  eq('and the cap is the constant, not a literal', ACTIONABLE_MAX_CHARS, 200);
 
   const ramble = gateObservation({ statement: debugMonologue, kind: SIGNAL.REMEMBER_REQUEST }, { maxChars: 400 });
   eq('the old 600-char ramble is refused', ramble.ok, false);
@@ -2038,6 +2068,15 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
   eq('with nothing queued it contributes nothing', specs[1].text(), '');
   check('the discipline section states the refusals', /不值得写的/.test(DISCIPLINE_SECTION));
   check('and the backtick rule that the gate actually enforces', /反引号/.test(DISCIPLINE_SECTION));
+  // The prompt must state the LENGTH limit too, and state the real number: a
+  // discipline section that mentions only backticks sends the model into the
+  // loop that produced this fix — adding handles to a sentence that is already
+  // full of them and over the cap.
+  check(
+    'and the length cap, with the number the gate really uses',
+    new RegExp(`${ACTIONABLE_MAX_CHARS} 字`).test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
   wired.dispose();
   sameList('disposal reaches every registration', disposed.sort(), ['guard', 'learn-discipline', 'learn-queue']);
 }
