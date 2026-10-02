@@ -211,6 +211,9 @@ SUBS = [
     # The plugin's own directory is whatever this file sits in, two levels up —
     # never hard-code the path of the machine that happened to render the shots.
     (os.path.dirname(HERE), "…"),
+    # The workspace the plugin was checked out into, for paths that point at a
+    # sibling of the plugin rather than inside it.
+    (os.path.dirname(os.path.dirname(HERE)), "<workdir>"),
     (os.environ.get("TEMP", "%TEMP%") + "\\learn-shots", "%TEMP%\\learn-shots"),
     (os.environ.get("TEMP", "%TEMP%"), "%TEMP%"),
     (os.path.join(os.path.expanduser("~"), ".dsh"), "<DSH_HOME>"),
@@ -218,11 +221,37 @@ SUBS = [
     ("…\\scripts\\", "scripts\\"),
 ]
 
+# Runs AFTER the shrinker, not with the rules above: replacing the home prefix
+# first turns `C:\Users\<name>\AppData\…` into `~\AppData\…`, which no longer
+# looks like an absolute path and so slips past the shrinker entirely — that is
+# exactly how a user name kept reaching a published card.
+SUBS_LAST = [
+    (os.path.expanduser("~"), "~"),
+]
+
 
 def pretty(line):
     for old, new in SUBS:
         line = line.replace(old, new)
+    line = ABS_PATH_RE.sub(shrink_path, line)
+    for old, new in SUBS_LAST:
+        line = line.replace(old, new)
     return line
+
+
+# The named rules above can only match a path they were told about. This is the
+# belt to their braces, and it exists because a card kept printing
+# `C:\Users\<name>\AppData\Local\hermes\…`: `short()` cuts the HEAD of a line, so
+# a substitution that only shortens a path's TAIL is invisible — the part that
+# runs off the card is the part nobody replaced. Any absolute Windows path that
+# survives the named rules gets cut down to its last two components, which is
+# enough to recognise the file and carries no user name and no machine layout.
+ABS_PATH_RE = re.compile(r"[A-Za-z]:\\[^\s\"'|,;)]+")
+
+
+def shrink_path(match):
+    parts = [part for part in match.group(0).split("\\") if part]
+    return "…\\" + "\\".join(parts[-2:]) if len(parts) > 2 else match.group(0)
 
 
 # ---------------------------------------------------------------- shots

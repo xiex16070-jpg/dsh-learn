@@ -40,6 +40,7 @@ const INCLUDE = [
   'cordis.patch.yml',
   'package.json',
   'icon.svg',
+  'screenshots.json',
   'docs/make-shots.py',
 ];
 

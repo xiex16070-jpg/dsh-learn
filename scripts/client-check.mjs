@@ -15,6 +15,7 @@
  * There is no browser here, and an emulated renderer is not a substitute for
  * looking at the thing.
  */
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -105,8 +106,19 @@ const KIND = 'learn-recap';
 function call(turn, callId, name, args) {
   return { type: 'tool/call', data: { turn, callId, name, arguments: typeof args === 'string' ? args : JSON.stringify(args) } };
 }
-function result(turn, callId, failed) {
-  return { type: 'tool/result', data: { turn, message: { source: { callId }, ...(failed === true ? { isError: true } : {}) } } };
+function result(turn, callId, failed, text) {
+  const content = typeof text === 'string' ? [{ type: 'text', text }] : undefined;
+  return {
+    type: 'tool/result',
+    data: {
+      turn,
+      message: {
+        source: { callId },
+        ...(failed === true ? { isError: true } : {}),
+        ...(content === undefined ? {} : { content }),
+      },
+    },
+  };
 }
 function startEvent(turn) { return { type: 'turn/start', data: { turn } }; }
 
@@ -329,6 +341,75 @@ const b = fold([startEvent(51), call(51, 'c2', 'learn_skill_manage', { action: '
 ok('each turn folds its own state', a.state !== b.state);
 eq('turn 50 sees only its own entry', publish(a.state, 50).value.entries.length, 1);
 eq('turn 50 entry is its own', publish(a.state, 50).value.entries[0].name, 'a');
+
+// ------------------------------------------------- 10. a refusal is not a success
+//
+// The audit that produced this section measured the live session log: a refused
+// `learn action=note` and a successful one BOTH arrive with `isError=false`. If the recap
+// only reads `isError`, the one case the user needs to see — the gate refused the lesson —
+// renders as the green "记住一条做法" line. These assertions pin the refusal path, and the
+// first one pins the marker itself against the module that writes it, so the two files
+// cannot drift apart without a red test.
+const toolsSource = readFileSync(join(HERE, '..', 'lib', 'tools.js'), 'utf8');
+const clientSource = readFileSync(TARGET, 'utf8');
+const refusedLiteral = /\[`(未写入)：\$\{result\.reason\}`/.exec(toolsSource)?.[1];
+ok('lib/tools.js still writes a stable refusal marker', typeof refusedLiteral === 'string' && refusedLiteral.length > 0);
+const clientMarker = /const REFUSED_PREFIX = '([^']+)'/.exec(clientSource)?.[1];
+eq('and the recap reads the same marker', clientMarker, refusedLiteral);
+
+const refusedTurn = fold([
+  startEvent(60),
+  call(60, 'c1', 'learn', { action: 'note', kind: 'technique', statement: '把 Tee-Object 接在 Select-Object 后面' }),
+  result(60, 'c1', false, '未写入：缺少可迁移的做法或具体对象（不是一条能照做的规则）\n门槛明细：general=ok；actionable=这条不合格'),
+]);
+const refusedValue = publish(refusedTurn.state, 60);
+const refusedLine = texts(render(refusedValue, 'zh')).join(' ');
+ok('a refused note renders as a refusal, not as a write', !refusedLine.includes('记住一条做法'), { line: refusedLine });
+ok('and it says the rule was not saved', refusedLine.includes('做法没能记下'), { line: refusedLine });
+eq('a refusal is amber, not green', refusedValue.value.entries[0].tone, 'warn');
+eq('and it is still one entry', refusedValue.value.entries.length, 1);
+ok('the English copy is a refusal too', texts(render(refusedValue, 'en')).join(' ').includes('could not save the technique'));
+
+const wroteTurn = fold([
+  startEvent(61),
+  call(61, 'c1', 'learn', { action: 'note', kind: 'technique', statement: '有效做法：先用 `node --check` 再提交' }),
+  result(61, 'c1', false, '已写入 tool-recovery 的规则 1xe1nh6：有效做法：先用 `node --check` 再提交'),
+]);
+const wroteValue = publish(wroteTurn.state, 61);
+ok('a note that landed still renders as a write', texts(render(wroteValue, 'zh')).join(' ').includes('记住一条做法'));
+eq('and it stays green', wroteValue.value.entries[0].tone, 'success');
+eq('and it is not marked failed', wroteValue.value.entries[0].failed, false);
+
+// A refused write and a successful one are two facts, even when the sentence matches.
+const mixedTurn = fold([
+  startEvent(62),
+  call(62, 'c1', 'learn_skill_manage', { action: 'update', name: 'tool-recovery' }),
+  result(62, 'c1', false, '未写入：规则缩水'),
+  call(62, 'c2', 'learn_skill_manage', { action: 'update', name: 'tool-recovery' }),
+  result(62, 'c2', false, '已写入 tool-recovery'),
+]);
+const mixedValue = publish(mixedTurn.state, 62);
+eq('a refused write and a successful one are two entries', mixedValue.value.entries.length, 2);
+eq('the refusal keeps the failed sentence', texts(render(mixedValue, 'zh')).join(' ').includes('修补失败'), true);
+
+// ------------------------------------------------- 11. delete says which delete it was
+const softDelete = fold([
+  startEvent(70),
+  call(70, 'c1', 'learn_skill_manage', { action: 'delete', name: 'old-skill' }),
+  result(70, 'c1', false, '已删除，但先把整份技能留在了归档里'),
+]);
+const softLine = texts(render(publish(softDelete.state, 70), 'zh')).join(' ');
+ok('an unconfirmed delete does not claim the copy is gone', !softLine.includes('永久删除'), { line: softLine });
+ok('it says the archive still has one', softLine.includes('归档里还留着一份'), { line: softLine });
+
+const hardDelete = fold([
+  startEvent(71),
+  call(71, 'c1', 'learn_skill_manage', { action: 'delete', name: 'old-skill', confirm: true }),
+  result(71, 'c1', false, '已删除'),
+]);
+const hardLine = texts(render(publish(hardDelete.state, 71), 'zh')).join(' ');
+ok('a confirmed delete does say it is for good', hardLine.includes('永久删除'), { line: hardLine });
+ok('and the English copy distinguishes them as well', texts(render(publish(softDelete.state, 70), 'en')).join(' ').includes('stays in the archive'));
 
 // ---------------------------------------------------------------- report
 console.log(`${checks - failures.length}/${checks} checks passed`);
