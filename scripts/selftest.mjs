@@ -60,6 +60,8 @@ import {
   looksLikeError,
   looksLikeIncidentReport,
   looksLikeStatusReport,
+  looksLikeToolEnvelope,
+  looksTransientToolError,
   looksOneOff,
   tokenize,
 } from '../lib/text.js';
@@ -320,6 +322,38 @@ start('skills — the learned root and rule surgery');
   eq('gutting a protected skill is refused', gut.ok, false);
   check('the refusal explains itself', /规则/.test(String(gut.refused)));
 
+  // Audit (b): keeping the HEADING is not keeping the RULES. v0.2.3 rewrote a
+  // protected umbrella with `## 规则` intact and every bullet gone, and reported
+  // success — the file looked healthy and had lost the only thing it exists for.
+  // A number the user cannot see shrinking is a number that will shrink.
+  skills.write('durable-preferences', {
+    description: 'd',
+    body: '# 偏好\n\n## 规则\n- 用中文回答\n- 回答前先跑测试\n',
+    meta: {},
+  });
+  const shrunk = skills.write('durable-preferences', {
+    description: 'd',
+    body: '# 偏好\n\n## 规则\n- 用中文回答\n',
+    meta: {},
+  });
+  eq('a rewrite that keeps the marker but drops a rule is refused', shrunk.ok, false);
+  check(
+    'the refusal counts both sides',
+    /现在有 2 条规则/.test(String(shrunk.refused)) && /只剩 1 条/.test(String(shrunk.refused)),
+  );
+  eq('the file on disk is untouched', skills.readRules('durable-preferences').length, 2);
+  eq(
+    'dropRules=true is the explicit way through',
+    skills.write('durable-preferences', {
+      description: 'd',
+      body: '# 偏好\n\n## 规则\n- 用中文回答\n',
+      meta: {},
+      dropRules: true,
+    }).ok,
+    true,
+  );
+  eq('and it really did drop the rule', skills.readRules('durable-preferences').length, 1);
+
   skills.write('durable-preferences', {
     description: 'd',
     body: '# 偏好\n\n## 规则\n- 用中文回答\n',
@@ -378,6 +412,26 @@ start('text — the P0-1 regression and the anti-capture gate');
     true,
   );
   eq('a short directive is actionable', isActionable('以后都用中文回复我', SIGNAL.REMEMBER_REQUEST), true);
+
+  // Found by filing a real lesson through the tool and watching it bounce: the
+  // ONLY difference between refused and accepted was backticks. `ARTIFACT_RE` is
+  // how `hasConcreteDetail` finds a handle and a bare cmdlet name in prose is not
+  // one it can see — so the refusal has to name the remedy, or the writer has no
+  // way to learn the rule.
+  const bareCmdlet = 'PowerShell 里把 Tee-Object -FilePath 接在 Select-Object -First 之后，只会写被截断的前缀';
+  const tickedCmdlet = 'PowerShell 里把 `Tee-Object -FilePath` 接在 `Select-Object -First` 之后，只会写被截断的前缀';
+  eq('a bare cmdlet name gives the gate no handle', isActionable(bareCmdlet, SIGNAL.TECHNIQUE), false);
+  eq('the same sentence with backticks does', isActionable(tickedCmdlet, SIGNAL.TECHNIQUE), true);
+  const bareRefusal = gateObservation(
+    { statement: bareCmdlet, kind: SIGNAL.TECHNIQUE },
+    { maxChars: 400, source: 'note' },
+  );
+  eq('so the bare sentence is refused', bareRefusal.ok, false);
+  check(
+    'and the refusal names the remedy rather than only the failure',
+    bareRefusal.reasons.some((reason) => reason.includes('反引号')),
+    bareRefusal.reasons,
+  );
 
   const ramble = gateObservation({ statement: debugMonologue, kind: SIGNAL.REMEMBER_REQUEST }, { maxChars: 400 });
   eq('the old 600-char ramble is refused', ramble.ok, false);
@@ -508,19 +562,36 @@ start('regression — the false positives the LIVE run actually produced');
       false,
     );
   }
-  // The two lessons the real-session replay actually produced must still pass —
-  // a gate that refuses everything is not a gate.
+  // These two were kept for a long time as the positive control: "the gate must
+  // not refuse everything". The gate was right and the fixture was wrong. Both
+  // are the host's own TRANSIENT edit errors — `old_string was not found` means
+  // the file moved under you, the edit tool's description already says to
+  // re-read, and the condition heals itself in the same session. There is
+  // nothing transferable in them, so they are now refused on purpose.
+  const transientEdits = [
+    'edit: Error: old_string was not found in "lib\\\\review.js"',
+    'edit: Error: old_string matched 2 times in "lib\\\\review.js"; provide a more specific old_string or set replace_all to true',
+  ];
+  eq('a transient edit error is recognised', looksLikeToolEnvelope(transientEdits[0]), true);
+  eq('and so is the replace_all variant', looksTransientToolError(transientEdits[1]), true);
+  for (const [i, text] of transientEdits.entries()) {
+    eq(
+      `transient edit error #${i + 1} is refused, not learned from`,
+      gateObservation({ statement: text, kind: 'RECOVERED_FAILURE', resolved: true }, { source: 'auto-tool' }).ok,
+      false,
+    );
+  }
+  // The positive control has to be a statement with a MECHANISM in it — that is
+  // exactly what the four strings above lack, and it is why they were noise.
   check(
-    'the real replay lesson still passes',
+    'a tool error that carries a mechanism still passes',
     gateObservation(
-      { statement: 'edit: Error: old_string was not found in "lib\\\\review.js"', kind: 'RECOVERED_FAILURE', resolved: true },
-      { source: 'auto-tool' },
-    ).ok,
-  );
-  check(
-    'and so does the replace_all one',
-    gateObservation(
-      { statement: 'edit: Error: old_string matched 2 times in "lib\\\\review.js"; provide a more specific old_string or set replace_all to true', kind: 'RECOVERED_FAILURE', resolved: true },
+      {
+        statement:
+          "node: Error: Cannot find module './sanitize.js' —— ESM 的相对导入必须带扩展名，CommonJS 可以省略，所以把 CJS 改写成 ESM 时要逐个补上 .js",
+        kind: 'RECOVERED_FAILURE',
+        resolved: true,
+      },
       { source: 'auto-tool' },
     ).ok,
   );
@@ -1030,6 +1101,15 @@ start('tools — the model-facing boundary');
   check('curator status reports the same basis as the automatic path', Boolean(await call(tools.learnCurator, { action: 'status' })));
   check('curator can be paused', Boolean(await call(tools.learnCurator, { action: 'pause' })));
   await call(tools.learnCurator, { action: 'resume' });
+  // `learn_curator action=run` was the one path NOTHING had ever exercised. Its
+  // last line called `.trim()` on `CURATOR_INVARIANTS`, which is an ARRAY, so the
+  // tool threw "trim is not a function" AFTER the maintenance pass had already
+  // run — the report of what happened was the thing that failed. force=true
+  // because the gate is closed by design on a fresh home.
+  const curatorRun = await call(tools.learnCurator, { action: 'run', force: true });
+  check('curator run survives all the way to its report', /维护/.test(String(curatorRun)), curatorRun);
+  check('and the report carries the invariants it must obey', /只碰本插件管理的技能/.test(String(curatorRun)), curatorRun);
+  check('the invariants are rendered as lines, not as a mangled value', !/\[object |trim is not a function/.test(String(curatorRun)), curatorRun);
   check('ledger recorded the decisions', store.readLedger().length > 0);
 
   const found = await call(tools.learnSkills, { query: '构建脚本 符号 测试树' });
@@ -1388,6 +1468,63 @@ start('skillfile — the always-on skill file');
 }
 
 // ============================================================ 12. repair
+
+// ==================================================== 17. config has readers
+
+start('config — every knob has a reader');
+{
+  // v0.2.1 shipped five keys that lived only in DEFAULTS and normalizeConfig:
+  // two references each, zero readers. v0.2.3 shipped three more of exactly the
+  // same shape (`review.ruleBudget`, `review.similarity`, `review.maxProposals`),
+  // while the README's config table sold all three as live knobs. A knob that
+  // does nothing is worse than a missing knob: it makes the config file a
+  // description of the system that is not true, and the doc table a lie the
+  // reader has no way to catch. This assertion is what makes the next one
+  // impossible — add a key, and it fails until something reads it.
+  const config = normalizeConfig({});
+  const libDir = join(here, '..', 'lib');
+  const sources = new Map();
+  for (const name of readdirSync(libDir)) {
+    if (!name.endsWith('.js') || name === 'config.js') continue;
+    sources.set(name, readFileSync(join(libDir, name), 'utf8'));
+  }
+  check('the reader scan found the modules', sources.size >= 15, sources.size);
+
+  /**
+   * A leaf is "read" when some module outside lib/config.js mentions both the
+   * group (`config.review`) and the leaf (`ruleBudget`). Not a type checker —
+   * it is aimed at the failure that actually happened, which is a key nobody
+   * mentioned at all.
+   */
+  const readers = (group, leaf) => {
+    const found = [];
+    for (const [name, text] of sources) {
+      if (group && !text.includes(group)) continue;
+      if (leaf && !text.includes(leaf)) continue;
+      found.push(name);
+    }
+    return found;
+  };
+
+  const leaves = [];
+  for (const [key, value] of Object.entries(config)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const leaf of Object.keys(value)) leaves.push({ key: `${key}.${leaf}`, group: `config.${key}`, leaf });
+    } else {
+      leaves.push({ key, group: `config.${key}`, leaf: null });
+    }
+  }
+  check('the config surface is non-trivial', leaves.length >= 15, leaves.length);
+  for (const entry of leaves) {
+    const found = readers(entry.group, entry.leaf);
+    check(`${entry.key} has a reader outside lib/config.js`, found.length > 0, { lookedIn: [...sources.keys()].length });
+  }
+  // The three that were placebos, named explicitly so a regression is obvious
+  // rather than folded into a loop that counts 18 keys.
+  eq('review.ruleBudget is wired', readers('config.review', 'ruleBudget').includes('review.js'), true);
+  eq('review.similarity is wired', readers('config.review', 'similarity').includes('review.js'), true);
+  eq('review.maxProposals is wired', readers('config.review', 'maxProposals').includes('review.js'), true);
+}
 
 start('repair — real signatures parse');
 {

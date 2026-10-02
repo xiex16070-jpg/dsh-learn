@@ -46,7 +46,7 @@ const INCLUDE = [
 // An allow-list, not a deny-list: this directory also collects throwaway probes
 // from unrelated work (launch-probe, loc-probe) and one-shot data repairs
 // (cleanup-v010, asar-inspect). A deny-list silently ships the next one.
-const PUBLISHED_SCRIPTS = ['selftest.mjs', 'replay-session.mjs', 'purge-noise.mjs', 'publish-github.mjs'];
+const PUBLISHED_SCRIPTS = ['selftest.mjs', 'client-check.mjs', 'replay-session.mjs', 'purge-noise.mjs', 'publish-github.mjs'];
 
 const GLOBS = [
   ['lib', (name) => name.endsWith('.js')],

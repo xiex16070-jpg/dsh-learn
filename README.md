@@ -12,7 +12,8 @@
 | 落盘时机 | 模型显式决定（`learn_skill_manage create` / `learn action=note`） |
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
-| 自测 | `npm test` —— 17 节，358 条断言，零依赖 |
+| 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
+| 自测 | `npm test` —— 宿主半边 18 节 399 条断言，浏览器半边 348 条，零依赖 |
 
 ---
 
@@ -35,8 +36,8 @@
 | 由那个后台模型决定存什么 | 前台模型决定；正则只负责提出候选 | 判断「这条是不是可迁移的类级做法」需要语义理解，正则做不到——v0.1.0 的事故就是证据（见下） |
 | 维护一套自己的记忆存储 | 直接写普通技能文件 | 用户能读、能改、能删、能版本控制；不需要让宿主多认一种格式 |
 | 一个无所不包的 `MEMORY.md` | 三个类级**伞技能**（`durable-preferences` / `tool-recovery` / `environment-facts`），每个只有一个写入目标 | 同一个事实只有一个家，不会散落多处互相矛盾 |
-| 归档 = 删除 | `curator.js`：自带 unref 定时器、只归档、从不删除 | 「忘掉」应该是可逆的；移出去的目录随手移回来就恢复了 |
-| 配置项越多越好 | 加一个键，必须同时加它的读者 | v0.2.0 删掉了 5 个没人读的安慰剂配置——它们让 README 看起来很强，实际什么都没做 |
+| 归档 = 删除 | `curator.js`：只归档、从不删除；每 10 分钟问一次「到期了吗」，真正跑不跑由空闲与周期两道闸门决定 | 「忘掉」应该是可逆的；移出去的目录随手移回来就恢复了。问得勤不等于跑得勤——检查只读一次状态 |
+| 配置项越多越好 | 加一个键，必须同时加它的读者——而且现在有测试盯着 | v0.2.0 删掉了 5 个没人读的安慰剂配置；v0.2.3 又长出 3 个（`review.ruleBudget` / `similarity` / `maxProposals`），v0.3.0 把它们接上了线，并加了一节断言：注册表里每个键都必须在 `lib/config.js` 之外有人读 |
 
 一个回合走完的路径：
 
@@ -45,11 +46,15 @@
 3. `agent/turn-stopping` → 防抖 4 秒后跑一次 `runReview(session, {dryRun:false})`。它**只写候选**到 `pending.json`，并且只在窗口观测数 ≥ `review.triggerObservations`（默认 3）时才跑。回合边界只负责调度，绝不 await——自我改进不能拖慢用户的回合。
 4. 模型看 `learn action=pending`，自己决定要不要写：`learn_skill_manage create`（新技能）或 `learn action=note`（往三把伞里加一条规则）。两条路都过同一套门槛与同一套内容卫生。
 5. 命中 `tokenSimilarity ≥ 0.6` 的既有规则会被**强化**（记一次命中、进 lessons）而不是复制一条。
-6. curator 自带定时器（默认周期 24h，定时器周期取周期的 1/4 并夹在 1 分钟–6 小时之间），只在**空闲且距上次维护够久**时把 `staleAfterDays`（14 天）以上的受管技能转成 `stale`、`archiveAfterDays`（30 天）以上的**移进归档目录**。
+6. curator 自带定时器（**每 10 分钟问一次是否到期**，那一次检查只读一个状态字段），只在**空闲且距上次维护够久**时把 `staleAfterDays`（14 天）以上的受管技能转成 `stale`、`archiveAfterDays`（30 天）以上的**移进归档目录**。被加载过 3 次以上的技能只标 `stale`、不自动归档——「有人还在用」比文件时间更可信。
 
 ![replay](docs/shots/03-replay.png)
 
-*把一整天的真实会话喂回插件：一百多条观测里，它只留下 1 条候选，而且是真的工具恢复教训（`edit: Error: cannot modify …: file has not been read`）。其余全被门槛说明理由拒掉。*
+*把一整天的真实会话（一万多个事件）喂回插件：8 条看着像教训的东西，一条都没留下——每条都给出了自己的理由。这是一次真实的运行结果，不是挑出来的漂亮样本。*
+
+![rules](docs/shots/04-rules.png)
+
+*而真的踩过坑之后，它是这么记的：规则带具体命令、带出处、能脱开那次事故独立成立。上面这三条来自写这个插件时的真事——`Tee-Object` 的截断、`robocopy` 对单文件的退出码、以及「grep 搜不到不等于不存在」。*
 
 ---
 
@@ -234,6 +239,22 @@ learn action=organize dryRun=false
 | 28 | 同一个 doctor 在 `host-root` 失败分支里，还在教用户去改 `cordis.patch.yml` 加 `customSkillDirs`——那条路在 v0.2.2 里已经删掉了，用户照着做只会白忙 | 改成 provider 的说法（注册发生在 `ctx.skills.registerProvider()`；改完重启 DSH；还是不行说明宿主 `skills` 服务没就绪） |
 | 29 | `learn action=status` 给共享根里的**别人**的技能打 `待收拢` 标签，等于承诺一次 `organize` 永远不会做的搬迁 | 标签的条件从 `legacy && live` 收紧到 `legacy && live && 归属是自己`，与 `organize` 的真实行为对齐 |
 
+### v0.3.0：把整条回路接上，以及第一次有东西可看
+
+v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临时 home 里做了两个探针，然后把盘上真实数据和 README 的每条声明对了一遍。它的总结论是：**这条回路能捕获、能打分、能排队，但它从来没有变成学习**——队列里有候选躺了一整天，三把伞技能里 0 条规则，`usage.json` 不存在，`curator_runs: 0`。六条都是同一个病的不同部位：**没有人在正确的时刻被叫来**。
+
+| # | 症状 | 修法 |
+|---|---|---|
+| 30 | 队列没有消费者。候选进了 `pending.json`，就再没有任何东西会把它们推出来；README 说「判决交给模型」，但没有任何触发器真的去叫模型 | ① 用户明确要求「记住」的（`source: user` + `kind: remember-request`）由自动审查**直接落盘**——「用户明确要求记住」本身就是模型会给出的判决，再排一次队只是增加延迟；② `learn action=pending` 现在给每条候选附上**它自己的提升命令**；③ 补上 `learn action=drop-pending`——`dropProposal` 一直存在，只是从来没人调用，「没有丢弃的队列只会变长」 |
+| 31 | 规则会被静默清空：`skills.write()` 只检查 `## 规则` 这个**标题**还在，于是 v0.2.3 把一把受保护技能重写成了标题还在、条目全空，还报了成功 | 受保护技能的写入前先数两边的规则条数，变少就拒绝，并给出三条出路（`learn action=undo ruleId=…` 撤单条 / 显式 `dropRules=true` 整体重写 / 或改写）。`removeRule` 与 `consolidate` 各自显式传 `dropRules: true`——它们**本来就是要让规则变少**，所以由调用方说清楚，而不是让守卫去猜 |
+| 32 | 活下来的假阳性全是同一个形状：`<工具>: Error: <一句带绝对路径的话>`。四条候选全是编辑本插件自己的源码时产生的工具报错，工具说明里早就写了该怎么做，而且在同一个会话里自愈 | 形如工具信封、且带机器路径或瞬态编辑错误的文本，自动路径不再捕获（`looksLikeToolEnvelope`）。**但**没有路径也没有瞬态的裸信封仍然放行：`node: Error: Cannot find module 'x'` 本身就是一条值得留下的诊断 |
+| 33 | 三个安慰剂配置回来了：`review.ruleBudget` / `similarity` / `maxProposals` 在 `lib/` 和 `scripts/` 里**没有任何读者**（常量是硬编码的），而 README 的配置表把它们当活旋钮卖 | 三个都接上线，并把实际生效的值放进返回对象的 `limits` 里；同时新增一节断言：注册表里每个键都必须在 `lib/config.js` 之外有人读。这正是插件自己 v0.2.0 立下的规矩——「加一个键，必须同时加它的读者」 |
+| 34 | `delete` 是真删：`skills.remove()` 是 `rmSync(dir, {recursive, force})`，不可逆，而工具说明里一个字都没提 | 默认改为**先归档再删**，返回归档路径，账本记 `recoverable: true`；真的要连归档副本一起抹掉，得显式传 `confirm=true`。一个把技能名打错的模型，以前能直接把技能毁掉 |
+| 35 | curator 在生产里**从来没跑过**（`curator_runs: 0`）：轮询周期是 `intervalHours/4` 封顶 6 小时，任何重启比 6 小时更勤的宿主永远等不到一次 tick——而所有单元测试都是手动调 `tick()`，所以全绿 | tick 与维护周期解耦：每 **10 分钟**问一次「到期了吗」（只读一次状态，很便宜），跑不跑仍由空闲与周期两道闸门决定。同时把 `usage.json` 里一直在收集、但从来没人用的 `loads` 接进保活判断：被加载过 3 次以上的技能，再老也只标「陈旧」，不自动归档 |
+| 36 | `learn_curator action=run` 会**崩在自己的最后一行**：`CURATOR_INVARIANTS` 是数组，代码对它调了 `.trim()`。崩在维护跑完之后，所以看起来像「什么都没做」 | 改成逐行渲染，并补上一条断言——报告 curator 干了什么的那个工具，恰好是从来没人跑过的那个 |
+
+同一个版本里还删掉了一批**够不着的死代码**：`lib/blocks.js` 从九个导出缩到一个（其余八个描述的是另一套系统：用户侧/环境侧的记忆分流、hub、`external_dirs`、读写前置守卫），`lib/storage.js` 的 `writeReport`/`patchReport`/`moveToArchive`/`listArchived` 和 `reports/`、`staging/` 两个**每次启动都建、从来没有写过**的目录，`lib/skills.js` 的 `stage`。判据写在 `blocks.js` 的头部注释里：**没有任何代码路径能走到的字符串不是文档，是第二份真相，而它只会漂移**。
+
 ---
 
 ## 磁盘布局
@@ -258,8 +279,7 @@ learn action=organize dryRun=false
 │   ├── learning-graph.json          # 学习图（技能 / 教训 / 候选 / 灵枢 memory 节点）
 │   ├── last-error.log               # 内部警告（锁回收、写入被拒等）
 │   ├── .lock                        # 写锁（openSync 'wx'）
-│   ├── archive/skills/<name>/       # 归档区：移动过来的，从没被删过
-│   └── reports/
+│   └── archive/skills/<name>/       # 归档区：移动过来的，从没被删过
 └── .dsh-memory/data/mdcg/contextual # 灵枢 memory 节点来源（没有就跳过，不报错）
 ```
 
@@ -271,10 +291,10 @@ learn action=organize dryRun=false
 
 | 工具 | 用途 | action | 主要参数 |
 |---|---|---|---|
-| `learn` | 状态、检索、候选、历史、撤销、整理、体检、图、写笔记 | `status`(默认) / `list` / `view` / `pending` / `history` / `undo` / `consolidate` / `organize` / `doctor` / `graph` / `note` / `pin` / `archive` / `restore-pending` | `name`、`ruleId`、`statement`、`kind` ∈ `remember-request` `user-preference` `user-correction` `durable-fact` `technique` `recovered-failure` `skill-wrong`、`session`、`umbrella` ∈ `durable-preferences` `tool-recovery` `environment-facts`、`pinned`、`adopt`、`dryRun`、`query`、`fp` |
+| `learn` | 状态、检索、候选、历史、撤销、整理、体检、图、写笔记 | `status`(默认) / `list` / `view` / `pending` / `history` / `undo` / `consolidate` / `organize` / `doctor` / `graph` / `note` / `pin` / `archive` / `restore-pending` / `drop-pending` | `name`、`ruleId`、`statement`、`kind` ∈ `remember-request` `user-preference` `user-correction` `durable-fact` `technique` `recovered-failure` `skill-wrong`、`session`、`umbrella` ∈ `durable-preferences` `tool-recovery` `environment-facts`、`pinned`、`adopt`、`dryRun`、`query`、`fp`、`reason` |
 | `learn_review` | 手动跑一次回合后审查 | `run` / `dry-run`(默认) | `session`、`minWeight` |
-| `learn_curator` | 生命周期维护 | `status` / `run` / `dry-run` / `pause` / `resume` | `force` |
-| `learn_skill_manage` | **唯一被校验的技能文件写入口** | `create`(默认) / `update` / `read` / `delete` / `archive` | `name`、`description`、`whenToUse`、`summary`、`conditions`、`steps`、`pitfalls`、`verification`、`notApplicable`、`body`、`overwrite`、`adopt` |
+| `learn_curator` | 生命周期维护（每 10 分钟问一次是否到期） | `status` / `run` / `dry-run` / `pause` / `resume` | `force` |
+| `learn_skill_manage` | **唯一被校验的技能文件写入口** | `create`(默认) / `update` / `read` / `delete` / `archive` | `name`、`description`、`whenToUse`、`summary`、`conditions`、`steps`、`pitfalls`、`verification`、`notApplicable`、`body`、`overwrite`、`adopt`、`dropRules`、`confirm` |
 | `learn_skills` | 语义检索（只看，不写） | — | `query`（必填）、`limit`（默认 5，夹在 1–20） |
 
 几个约定：
@@ -282,15 +302,39 @@ learn action=organize dryRun=false
 - `learn action=note` 与 `learn_skill_manage create` 的差别是**落点**：前者往三把伞里加一条规则（走 `review.remember()` 的门槛与去重），后者是独立技能文件。
 - `learn_skill_manage` 的 `description` **必填**——它是未来唯一的路由信号；超过 500 字会**拒收**（不是截断），理由里直接说「被截掉的往往正是触发词」。
 - `learn_skill_manage create` 撞上已有技能时：本插件自己建的要 `overwrite=true`；**不是它建的**（不在 `managed.json`）要 `adopt=true`，否则拒绝覆盖用户自己写的技能。
-- `delete` / `archive` 的鉴权是函数第一句；`archive` 是移动，`delete` 才真的删，两者都写账本（`skill.archive` / `skill.delete`）。
+- `delete` / `archive` 的鉴权是函数第一句；`archive` 是移动，`delete` **默认也是先移动**（归档后返回路径、账本记 `recoverable: true`），只有 `confirm=true` 才真的 `rmSync`，两者都写账本（`skill.archive` / `skill.delete`）。
 - `learn` 与 `learn_skills` 是并发安全的（只读），其余三个不是。
 - `consolidate` 与 `organize` 默认 `dryRun=true`，要看真动作得显式关掉。
 
 ---
 
+## 回合回执：这个回合学到了什么
+
+工具是给模型看的，`learn action=status` 是给排查的人看的——**没有一个东西是给正在用的人看的**。所以 v0.3.0 加了浏览器半边 `lib/client.js`：每个回合结束后，在回复下方留一行彩色回执，写清这一回合到底写了什么。
+
+```
+· 技能 'deepseek-harness-ops' 已写入 (references/dsh-learn-plugin-audit.md) · 技能 'agent-learning-loop-design' 已创建 · 候选 'edit: Error: cannot modify …' 待你点头
+```
+
+它落在 `conversation.chat.turnTail` 这个座位上，形态是**纯客户端**的：
+
+| | |
+|---|---|
+| 数据从哪来 | 这个会话自己的 `tool/call` + `tool/result` 事件流。调用身份是 `tool/call` 的 `data.callId`，配 `tool/result` 的 `data.message.source.callId`（不是 `data.error`，也不是 `data.meta.callId`） |
+| 有没有往会话里写东西 | **没有**。不追加自定义事件类型，不注册宿主路由，不动提示词——会话日志是用户的凭据，往里写一个宿主不认识的事件类型，风险远大于收益 |
+| 什么都不发生时 | 什么都不渲染。`buildLocationData()` 返回 `null`，`turnTail` 那一行就不存在；没有「本回合无学习」这种凑数的空话 |
+| 颜色 | 只用主题令牌（`--dsw-alias-state-success-primary` / `-warn-` / `-error-` / `-label-secondary` / `--dsw-alias-brand-primary` / `--dsw-alias-state-idle-primary`），没有硬编码色值，亮/暗主题都跟着走 |
+| 文案 | 全走 `ctx.locale`，`zh` / `en` 两份 |
+
+它**不替换**任何工具输出，也不假装自己比工具更权威：回执里出现的每一条，都能在同回合的工具调用里找到出处。
+
+**它没被证明的部分，说清楚**：`scripts/client-check.mjs` 证明的是折叠逻辑（348 条断言，含 11 个注入缺陷的变异测试，10 个被抓出，剩下 1 个是等价变异体）。它**没有**证明外观——这里没有浏览器，而模拟渲染器不能替代真的看一眼。第一次真机上看到的回执长什么样，以你自己的眼睛为准。
+
+---
+
 ## 五道门，以及拒收怎么读
 
-写库前过的是 `review.js` 的 `gatesFor()`，它按顺序产出**六项检查**。模型可见的词汇是「**五道门**」（`blocks.js` 的 `CANDIDATE_GATES`），第六项 `routed` 是伞路由检查，不属于那五道门：
+写库前过的是 `review.js` 的 `gatesFor()`，它按顺序产出**六项检查**：前五项就是「五道门」，第六项 `routed` 是伞路由检查，不属于那五道门。门本身在 `text.js` 里实现（`gateObservation` 与 `isActionable`），下表只说明每道门拒什么：
 
 | 检查 | 拒绝什么 | 拒收理由（逐字） |
 |---|---|---|
@@ -385,6 +429,8 @@ learn action=doctor      # root / skills / host-root / legacy / budget / sidecar
 
 `dshHome` 的解析顺序：`config.dshHome` → `config.dsh_home` → 环境变量 `DSH_HOME` → `~/.dsh`。
 
+这张表里的**每一个键**都有代码在读它——而且有测试盯着：`npm test` 的「每个配置键都有读者」那一节会扫 `lib/config.js` 之外的所有模块，任何一个键找不到读者就红。立这条规矩是因为它被违反过两次：v0.2.0 删掉了 5 个没人读的键，v0.2.3 又长出 3 个（`review.ruleBudget` / `similarity` / `maxProposals`），而 README 一直把它们当活旋钮在卖。
+
 ---
 
 ## 自测
@@ -393,7 +439,7 @@ learn action=doctor      # root / skills / host-root / legacy / budget / sidecar
 node scripts/selftest.mjs
 ```
 
-`scripts/selftest.mjs` 是**独立、零依赖**的纯断言脚本（`check(label, condition, extra)`，失败即 `process.exit(1)`），17 节：脱敏与注入筛查、写锁与状态、专属根与规则手术、P0-1 回归与反捕获门槛、**真实对话里的假阳性回归**、观测窗口、**真实事件流与 callId 配对**、候选→确认→强化→合并→撤回、归属与销毁权、curator 生命周期、工具边界、**探针（宿主说了算）**、**提供者契约（`validateCandidate` 不允许一行出错）**、迁移（看得见才搬 / 旧副本不能遮蔽新根）、常驻技能文件、真实签名解析。它**不碰真实的 `~/.dsh`**：每一节用 `<插件目录>/.selftest-home/<节名>` 做一次性的 DSH home。
+`scripts/selftest.mjs` 是**独立、零依赖**的纯断言脚本（`check(label, condition, extra)`，失败即 `process.exit(1)`），18 节：脱敏与注入筛查、写锁与状态、专属根与规则手术、P0-1 回归与反捕获门槛、**真实对话里的假阳性回归**、观测窗口、**真实事件流与 callId 配对**、候选→确认→强化→合并→撤回、归属与销毁权、curator 生命周期、工具边界、**探针（宿主说了算）**、**提供者契约（`validateCandidate` 不允许一行出错）**、迁移（看得见才搬 / 旧副本不能遮蔽新根）、常驻技能文件、**每个配置键都有读者**、真实签名解析。它**不碰真实的 `~/.dsh`**：每一节用 `<插件目录>/.selftest-home/<节名>` 做一次性的 DSH home。
 
 两件与真机安全有关的事：
 
@@ -403,7 +449,8 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-358/358 checks passed — all green
+399/399 checks passed — all green
+348/348 checks passed
 ```
 
 「真实对话里的假阳性回归」那一节把**跑挂过插件的原话逐字抄进去**当夹具（含那 240 字的 PowerShell 脚本原文、
@@ -415,7 +462,8 @@ node scripts/selftest.mjs
 
 | 脚本 | 用途 |
 |---|---|
-| `scripts/selftest.mjs` | 17 节断言，`npm test` |
+| `scripts/selftest.mjs` | 宿主半边：18 节断言，`npm test` |
+| `scripts/client-check.mjs` | 浏览器半边：把 `lib/client.js` 塞进一个假的 `window.__ModuleLoader__`，驱动**真的** `match`/`start`/`update`/`buildLocationData`，再用假的 `jsx` 渲染**真的**组件。它证明的是**折叠逻辑**——哪次调用该留一行、哪次该去重、失败的调用是不是被涂成失败、什么都没发生的回合是不是什么都不发布。它**证明不了外观**：这里没有浏览器，模拟渲染器不能替代真的看一眼 |
 | `scripts/replay-session.mjs` | 把**真实会话重放**给插件：`node scripts/replay-session.mjs --latest 1`。会话文件是一串**逐次追加拼接的 zstd 帧**，`zstdDecompressSync` 只解得出第一帧——脚本按 magic `28 b5 2f fd` 逐帧解再拼。这是最有说服力的验收方式 |
 | `scripts/purge-noise.mjs` | 用**插件自己的** `review.gatesFor()` 重判队列里的每条候选（清理工具不该有自己的质量主张），并合并账本里重复的拒收行。默认 dry-run，`--apply` 才写 |
 | `scripts/cleanup-v010.mjs` | 清 v0.1.0 的脏数据：frontmatter 里的 `managed-by`/`learn.*` 遥测、伞技能里那段插件自己的英文独白规则、旧形状的裸数组 `pending.json`、账本/lessons 里关于插件自己的散文；**没有 v0.1.0 标记的用户技能一律 SKIP**。另外把数据目录从 `<DSH_HOME>/learn/` 搬到 `<DSH_HOME>/learn/data/`（`state.json` 按键合并，新值优先） |

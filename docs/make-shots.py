@@ -43,6 +43,15 @@ CJK_RE = re.compile(
     r"\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u3000-\u303f]"
 )
 
+# One CJK character per token, everything else kept as a run: a line can break
+# between Chinese characters but not in the middle of `scripts/selftest.mjs`.
+WRAP_TOKEN_RE = re.compile(
+    r"[\u1100-\u115f\u2e80-\ua4cf\ua960-\ua97f\uac00-\ud7ff\uf900-\ufaff"
+    r"\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u3000-\u303f]"
+    r"|[^\u1100-\u115f\u2e80-\ua4cf\ua960-\ua97f\uac00-\ud7ff\uf900-\ufaff"
+    r"\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u3000-\u303f]+"
+)
+
 _cache = {}
 
 
@@ -119,24 +128,29 @@ def window(lines, size=17, lead=27, width=None, title="", pad=26, min_h=0):
 
     # Wrap first, so a long path cannot run off the card. Continuation lines are
     # indented under their first line the way a terminal wraps a paragraph.
+    #
+    # Two traps this used to fall into. It skipped wrapping for any entry that
+    # carried an explicit style, which is exactly the entries long enough to need
+    # it. And it split on spaces — a Chinese sentence has none, so the whole
+    # paragraph became a single unbreakable chunk. Wrapping is now by MEASURED
+    # width over tokens that keep Latin words whole and break CJK per character.
     limit = (width - pad * 2) if width else None
     wrapped = []
     for entry in lines:
         text, style = (entry, None) if isinstance(entry, str) else entry
-        if style or limit is None or text_width(pd, text, size) <= limit:
+        if limit is None or style == "blank" or text_width(pd, text, size) <= limit:
             wrapped.append((text, style))
             continue
         indent = " " * 2
         current = ""
-        for word in re.split(r"(?<= )", text):
-            trial = current + word
-            if current and text_width(pd, indent + trial, size) > limit:
-                wrapped.append((indent + current.rstrip(), None))
-                current = word
+        for token in WRAP_TOKEN_RE.findall(text):
+            if current and text_width(pd, indent + current + token, size) > limit:
+                wrapped.append((indent + current.rstrip(), style))
+                current = token.lstrip() if token.strip() else ""
             else:
-                current = trial
+                current += token
         if current.strip():
-            wrapped.append((indent + current.rstrip(), None))
+            wrapped.append((indent + current.rstrip(), style))
     lines = wrapped
 
     body_w = max([text_width(pd, t, size) for t, _ in [(e, None) if isinstance(e, str) else e for e in lines]] + [10])
@@ -246,6 +260,17 @@ def shot_cover():
     return save(img, "01-cover.png")
 
 
+def section_count():
+    """How many `start(...)` sections the selftest actually has.
+
+    Counted, not typed. The title said 15, then 16, then 17 while the file grew —
+    a number copied into a caption is a number that is wrong by the next commit.
+    """
+    src = os.path.join(os.path.dirname(HERE), "scripts", "selftest.mjs")
+    with open(src, encoding="utf-8") as fh:
+        return sum(1 for line in fh if line.startswith("start('"))
+
+
 def shot_selftest():
     lines = []
     for line in read("03-selftest.txt"):
@@ -255,36 +280,94 @@ def shot_selftest():
         lines.append(line)
     lines = [l for l in lines if l.strip()][-14:]
     lines = [("npm test", "cmd"), ("", "blank")] + lines
-    return save(window(lines, width=980, title="scripts/selftest.mjs — 17 节，零依赖"), "02-selftest.png")
+    title = f"scripts/selftest.mjs — {section_count()} 节，零依赖"
+    return save(window(lines, width=980, title=title), "02-selftest.png")
+
+
+def short(text, limit):
+    # Markdown emphasis is for the README, not for a terminal card.
+    text = " ".join(text.split()).replace("**", "")
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def unjson(text):
+    """Undo the JSON string escaping the capture carries, before pretty() runs.
+
+    `pretty()` substitutes real Windows paths; it cannot match a path whose
+    backslashes are doubled and whose quotes are backslash-escaped, so `C:\\\\Users`
+    and `\\"` used to reach the card verbatim.
+    """
+    text = text.replace("\\n", " ").replace("\\r", "").replace("\\t", " ")
+    return re.sub(r"\\(.)", r"\1", text)
 
 
 def shot_replay():
     raw = read("01-replay.txt")
-    keep = []
-    started = False
-    for line in raw:
-        if line.startswith("=== 队列"):
-            started = True
-        if started:
-            keep.append(pretty(line))
-    keep = [l for l in keep if l.strip()][:11]
     # The event count is read from the capture, never typed: a hard-coded number
     # here goes stale the moment the session it was copied from grows.
     counts = next((l for l in raw if " 事件 " in l), "").strip()
     caption = f"把真实会话（{counts.split('（')[-1].rstrip('）') if counts else '数千个事件'}）喂回插件，看它会提出什么："
-    keep = [
-        ("node scripts/replay-session.mjs --latest 1", "cmd"),
-        caption,
-        ("", "blank"),
-    ] + keep
-    return save(window(keep, width=1120, title="真实会话回放"), "03-replay.png")
+
+    # What is worth looking at in the capture is not the JSON — it is the pairs of
+    # "this looked like a lesson" and "here is why it is not one". Only the REAL
+    # run carries reasons; the dry run above it lists raw candidates, so the scan
+    # starts at the marker and not at the top of the file.
+    pairs = []
+    statement = None
+    for line in raw:
+        if line.startswith("=== 如果现在真的跑一次"):
+            pairs, statement = [], None
+            continue
+        text = line.strip()
+        if text.startswith('"statement":'):
+            statement = pretty(unjson(text[len('"statement":') :].strip().rstrip(",").strip('"')))
+        elif text.startswith('"reason":') and statement:
+            reason = unjson(text[len('"reason":') :].strip().rstrip(",").strip('"'))
+            pairs.append((statement, reason))
+            statement = None
+
+    body = [("node scripts/replay-session.mjs --latest 1", "cmd"), caption, ("", "blank")]
+    body.append((f"看着像教训的 {len(pairs)} 条，全部拒收——每条都写明了为什么：", FG))
+    body.append(("", "blank"))
+    for statement, reason in pairs[:3]:
+        body.append(("· " + short(statement, 70), DIM))
+        body.append(("   × 拒收：" + short(reason, 150), FG))
+    if len(pairs) > 3:
+        body.append((f"   …还有 {len(pairs) - 3} 条，同样各带一条理由", DIM))
+    body.append(("", "blank"))
+    body.append(("队列 0 条：门槛过了才会进队列，进了队列也要你点头才写成技能。", GREEN))
+    return save(window(body, width=1120, title="真实会话回放"), "03-replay.png")
 
 
-def shot_pending():
-    raw = read("04-pending.txt")
-    keep = [pretty(l) for l in raw[5:] if l.strip() and not l.startswith("（回放库")]
-    body = [("learn action=pending", "cmd"), ("", "blank")] + keep
-    return save(window(body, width=1160, title="候选队列：只有过了门槛的才出现在这里"), "04-pending.png")
+def shot_rules():
+    """What the funnel actually produces — the rules on disk, with provenance.
+
+    This used to render `learn action=pending`, which is the *queue*: empty in a
+    healthy install, and an empty card is a screenshot of nothing. The written
+    rules are the part a reader wants to see.
+    """
+    raw = read("04-rules.txt")
+    description = ""
+    texts = []
+    for line in raw:
+        text = line.strip()
+        if text.startswith('"description":'):
+            description = text[len('"description":') :].strip().rstrip(",").strip('"')
+        elif text.startswith('"text":'):
+            texts.append(pretty(text[len('"text":') :].strip().rstrip(",").strip('"')))
+    body = [("learn action=view name=tool-recovery", "cmd"), ("", "blank")]
+    if description:
+        body.append((description, DIM))
+        body.append(("", "blank"))
+    body.append((f"规则 {len(texts)} 条：", GREEN))
+    for text in texts:
+        if "（来自 " in text:
+            head, _, rest = text.partition("（来自 ")
+            body.append(("· " + head.rstrip(), FG))
+            body.append(("     （来自 " + rest, DIM))
+        else:
+            body.append(("· " + text, FG))
+    return save(window(body, width=1140, title="写进去的规则长什么样"), "04-rules.png")
 
 
 def shot_layout():
@@ -312,7 +395,7 @@ def main():
     shot_cover()
     shot_selftest()
     shot_replay()
-    shot_pending()
+    shot_rules()
     shot_layout()
 
 
