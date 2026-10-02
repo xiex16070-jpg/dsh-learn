@@ -334,16 +334,21 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 工具是给模型看的，`learn action=status` 是给排查的人看的——**没有一个东西是给正在用的人看的**。所以 v0.3.0 加了浏览器半边 `lib/client.js`：每个回合结束后，在回复下方留一行彩色回执，写清这一回合到底写了什么。
 
 ```
-· 技能 'deepseek-harness-ops' 已写入 (references/dsh-learn-plugin-audit.md) · 技能 'agent-learning-loop-design' 已创建 · 候选 'edit: Error: cannot modify …' 待你点头
+· 记住一条排障做法 · 技能 'tool-recovery' 已修补
 ```
+
+这一行是折叠器**真能**产出的话：回执里的每一句都取自 `lib/client.js` 的 `zh` / `en` 词条，没有一句是另外手写的。所以它不会承诺一个折叠器产不出的句子——写这一节时我先放了一句「候选 '…' 待你点头」当样例，那句话在这份代码里根本不存在，是同一类「第二份真相」，已经换掉了。
 
 它落在 `conversation.chat.turnTail` 这个座位上，形态是**纯客户端**的：
 
 | | |
 |---|---|
 | 数据从哪来 | 这个会话自己的 `tool/call` + `tool/result` 事件流。调用身份是 `tool/call` 的 `data.callId`，配 `tool/result` 的 `data.message.source.callId`（不是 `data.error`，也不是 `data.meta.callId`） |
+| 出现了什么才有回执 | **只有写动作**。它数的是这一回合调过哪些学习工具、以及那些调用有没有失败：`learn action=note`（带 `kind` 的分门别类）、`learn_skill_manage` 的 create / update / delete / archive、`learn action=undo|consolidate|organize|pin|archive|restore-pending`、`learn_review` 与 `learn_curator` 的写动作 |
+| 什么不算 | **只读动作不算**：`status` / `list` / `view` / `pending` / `history` / `graph` / `doctor` 和 `learn_skills` 一行都不出——它们没改任何东西。**自动审查也不算**：回合结束时那次审查只往队列里放候选，没有写进技能库，而且它不经过工具调用，浏览器半边根本看不见它。候选的去向由提示词里那段 `[learn] 有 N 条候选还没有着落` 负责，不由回执负责 |
 | 有没有往会话里写东西 | **没有**。不追加自定义事件类型，不注册宿主路由，不动提示词——会话日志是用户的凭据，往里写一个宿主不认识的事件类型，风险远大于收益 |
-| 什么都不发生时 | 什么都不渲染。`buildLocationData()` 返回 `null`，`turnTail` 那一行就不存在；没有「本回合无学习」这种凑数的空话 |
+| 什么都不发生时 | 什么都不渲染。`buildLocationData()` 返回 `null`，`turnTail` 那一行就不存在；没有「本回合无学习」这种凑数的空话。**一次只读诊断之后什么都不显示，是正常的，不是坏了** |
+| 从哪一回合开始算 | 只对**浏览器半边装上之后**发生的回合生效。装好、重启，然后**之前**那些回合不会补出回执——折叠器只看往后的新事件，不追历史。所以刚装完那阵子看不到是常态：得先有一个「写过东西」的回合，才会有第一行。这一条是被真实困惑逼出来的（装完重启后一直没看见，量了时间轴才发现：那段时间里唯一跑完的回合一个学习工具都没调） |
 | 颜色 | 只用主题令牌（`--dsw-alias-state-success-primary` / `-warn-` / `-error-` / `-label-secondary` / `--dsw-alias-brand-primary` / `--dsw-alias-state-idle-primary`），没有硬编码色值，亮/暗主题都跟着走 |
 | 文案 | 全走 `ctx.locale`，`zh` / `en` 两份 |
 
