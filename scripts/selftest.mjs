@@ -946,6 +946,49 @@ start('extract — the real event feed, including the callId join');
   eq('cwd is read from the header event', extract.cwd(REAL_EVENTS.session).endsWith('win-unpacked'), true);
   eq('skill name is read from the call args', extract.skillName({ type: 'tool/call', data: { callId: 'c9', name: 'skill', arguments: '{"name":"self-learning-loop"}' } }), 'self-learning-loop');
   eq('unknown shapes degrade to empty, never throw', extract.toolName(undefined), '');
+
+  // ---- the `ptc` agent preset's shape: ONE event carries the call and its answer ---------
+  // Measured on the live `--D-Download-youtube-ambilight-2.38.17--` session: its 471
+  // `tool/call` events were EVERY ONE of them `run_code`, and the 33 `learn` calls arrived as
+  // `tool/ptc-dispatch` with `data.name` / `data.arguments` / `data.isError` / `data.content`
+  // and no paired result event. `lib/index.js` feeds that shape to the same `recordAnswer`
+  // path as a `tool/result`, so the reader is pinned against the real shape here rather than
+  // against a shape someone imagined.
+  const PTC_DISPATCH = {
+    type: 'tool/ptc-dispatch',
+    data: {
+      subCallId: 'call_root:ptc:1',
+      name: 'learn',
+      arguments: { action: 'note', kind: 'technique', statement: '先用 `node --check` 过一遍再提交' },
+      isError: false,
+      content: [{ type: 'text', text: '已写入 tool-recovery 的规则 lmz9da：先用 `node --check` 过一遍再提交' }],
+    },
+  };
+  eq('ptc: the tool name is on the event, no call id needed', extract.toolName(PTC_DISPATCH), 'learn');
+  eq('ptc: the arguments are on the event too', extract.args(PTC_DISPATCH).action, 'note');
+  eq('ptc: the answer is read off the same event', extract.content(PTC_DISPATCH).startsWith('已写入 tool-recovery'), true);
+  eq('ptc: a clean dispatch is not a failure', extract.failed(PTC_DISPATCH), false);
+  eq(
+    'ptc: a dispatch the host marked isError is one',
+    extract.failed({ type: 'tool/ptc-dispatch', data: { name: 'learn', isError: true, content: [{ type: 'text', text: 'boom' }] } }),
+    true,
+  );
+  // Verified against the same session: 0 of 939 `tool/ptc-dispatch-start` events carried any
+  // `content` or `isError` — they announce the call before it runs. Folding them would print
+  // every line twice, so they must read as empty.
+  eq(
+    'ptc: the announcing event carries nothing and must not look like an answer',
+    extract.content({ type: 'tool/ptc-dispatch-start', data: { name: 'learn', arguments: { action: 'pending' } } }),
+    '',
+  );
+  eq(
+    'ptc: a dispatched skill load names the skill',
+    extract.skillName({
+      type: 'tool/ptc-dispatch',
+      data: { name: 'skill', arguments: { name: 'self-learning-loop' }, content: [{ type: 'text', text: '# self-learning-loop' }] },
+    }),
+    'self-learning-loop',
+  );
 }
 
 // ============================================================ 7. review
@@ -2264,6 +2307,34 @@ start('safety — the guards the mutation testing walked straight through');
   });
   check('a note that really lands starts with 已写入', /^已写入 /.test(landedNote), landedNote);
   check('and names the destination skill and quotes the rule', /^已写入 \S+ 的规则 \S+：.+/.test(landedNote), landedNote);
+
+  // The `ptc` preset is the one shape no unit test here can reach: the host wiring lives inside
+  // `apply()`, which needs a live Cordis context, and the recap lives in a browser module this
+  // script never loads. So this pins the WIRING by text — weak on purpose, and honest about it.
+  // What proves the behaviour is `scripts/client-check.mjs` section 14, where deleting the
+  // `match` line turns the suite red.
+  const wired = readFileSync(join(here, '..', 'lib', 'index.js'), 'utf8');
+  check(
+    'the host half listens for dispatched tools, not just tool/call',
+    /if \(ev\.type === 'tool\/ptc-dispatch'\) \{[\s\S]{0,1400}?recordAnswer\(ev, sessionId\);/.test(wired),
+    'lib/index.js no longer routes tool/ptc-dispatch into recordAnswer',
+  );
+  check(
+    'and both event shapes share one result handler',
+    (wired.match(/recordAnswer\(ev, sessionId\);/g) || []).length === 2,
+    (wired.match(/recordAnswer\(ev, sessionId\);/g) || []).length,
+  );
+  const browserHalf = readFileSync(join(here, '..', 'lib', 'client.js'), 'utf8');
+  check(
+    'the browser half folds a dispatched tool',
+    /if \(event\.type === 'tool\/ptc-dispatch'\) return recordDispatch\(state, event\);/.test(browserHalf),
+    'lib/client.js no longer folds tool/ptc-dispatch',
+  );
+  check(
+    'and the turn registry matches it, which is what makes the line visible at all',
+    /if \(event\.type === 'tool\/ptc-dispatch'\) return \{ id: String\(turn\), role: 'update' \};/.test(browserHalf),
+    'lib/client.js no longer matches tool/ptc-dispatch in `match`',
+  );
 }
 
 start('repair — real signatures parse');

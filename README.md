@@ -13,7 +13,7 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 21 节 597 条断言，浏览器半边 430 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 21 节 608 条断言，浏览器半边 443 条，零依赖 |
 
 ---
 
@@ -274,7 +274,7 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 - `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
 - 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
 
-自检现在 **21 节 597 条断言**（浏览器半边 430 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+自检现在 **21 节 608 条断言**（浏览器半边 443 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
 
 ### v0.3.2：变异测试没抓住的那几个守卫
 
@@ -337,6 +337,38 @@ v0.3.4 把措辞修对了，但那一行仍然只报**类别**：
 | 56 | `learn action=note` 命中指令注入时答的是「这条陈述命中「指令注入」特征，拒绝写入…」——**没有 `未写入` 前缀**。而 v0.3.2 起回执靠这个前缀判断「没写成」，所以这一条被渲染成了绿色成功行。同一类问题的第三次出现：**判定依据和实际答复是两个真相** | 那句答复补上 `未写入：` 前缀（`lib/tools.js`），同时把 `note` 的成败判定从「没有拒绝标记」正过来：**只有答出 `已写入…` / `已并入既有规则（…）` 才算写成**，门槛拒收、注入拒收、参数写错一律 `refused`。测试直接从 `lib/tools.js` 里读那句字面量再断言 |
 
 `scripts/client-check.mjs` 新增第 13 节（真实答复句驱动：落点解析、同伞三条不同规则渲染成三行、同一条重复两次才是 `×2`、80 字截断、注入拒收不再是绿色），`scripts/selftest.mjs` 的 `safety` 一节直接调真的 `learn action=note` 断言注入答复 `startsWith('未写入：')`——**两个半边各自钉住自己那一侧的字面量**。
+
+### v0.3.6：在 `ptc` 工作区里，学习发生了，回执一个字都没看见
+
+作者在 `D:\Download\youtube-ambilight-2.38.17` 这个工作区聊了很多轮，回执**一次都没出现过**，于是问了一句：这个插件到底是全局的，还是只在我这一个对话里生效？
+
+先回答这个问题——**它是全局的，而且那里的学习一直在发生**：
+
+- `~/.dsh/profiles/desktop/package.json` 的 `dsh.profile.bundles` 里就写着 `dsh-learn`，和 `dsh-base`、`dsh-web-app` 并列；磁盘上只有 `acp` / `desktop` 两个 profile，没有第二个在跑这个工作区。
+- 账本里 **173 行**记着那四个 session id（一个主会话 + 三个 subagent）。
+- 光 `2026-10-03` 那天，从那个工作区落盘了 **16 条规则**，内容全是那边的活：`在 run_code 里给 compress 写长摘要时，不要把正文放进反引号模板字符串`、`浏览器(e2e)测试脚本在本机必须给 run_code 传显式 timeoutMs(>=240000)`、`本机 Playwright 没有捆绑 Chromium，只能用 channel: "msedge"`……一条不少，都在 `~/.dsh/skills/learned/` 里。
+
+**坏掉的是回执，不是学习。** 原因是那个工作区用的是 `ptc` agent preset：模型手里只有一个 `run_code`，别的工具都在它里面派发。实测解开那个 5.28 MB 的会话文件（`session.v4.jsonl.zstd`，4993 个事件）：
+
+| 事件 | 数量 |
+| --- | --- |
+| `tool/call` | **471，全部是 `run_code`** |
+| `tool/ptc-dispatch` | **939**（`read` 265、`grep` 186、`pwsh` 143、`edit` 133、`write` 76、**`learn` 33**、`compress` 31……） |
+| `tool/result` | 501，**全部只带根 callId，没有一个含 `:ptc:`** |
+
+也就是说：`learn` 在那里被调用了 33 次（16 次真的写成），**而回执盯着的 `tool/call` 事件里，那 471 条没有一条是 `learn`**。回执看不见它，不是因为门槛拒了，是因为它根本没在看的那个事件上。
+
+| # | 缺陷 | 怎么改的 |
+| --- | --- | --- |
+| 57 | 宿主半边的 `session/event` 只处理 `tool/call` + `tool/result`，浏览器半边的 `foldEvent` 与 turn 注册表的 `match` 也只认 `tool/call`。`ptc` preset 下这些事件一个都不出现，取而代之的是**一个自带调用与答复两半的 `tool/ptc-dispatch`**——于是学习照常发生，回执全程静默。副产物：`skill.load` 在那类工作区里也从来没记过，因为答复路径能看到的工具名永远只有 `run_code` | 三处各补一条：`lib/index.js` 把 `tool/result` 的处理体抽成 `recordAnswer(ev, sessionId)`，再让 `tool/ptc-dispatch` 走同一个函数（**一份逻辑，不是抄一份**）；`lib/client.js` 的 `foldEvent` 增加 `tool/ptc-dispatch → recordDispatch()`；turn 注册表的 `match` 增加同一条。`lib/extract.js` **一个字都不用改**——它读 `data.name` / `data.arguments` / `data.isError` / `data.content`，`ptc` 事件这四样全都有。`tool/ptc-dispatch-start` 故意不接：实测 939 条里**带内容的 0 条**，接上去只会每行打印两遍 |
+
+确认这条路真的通，靠的不是推理：宿主自带的 `@deepseek-ai/dsh-client-ui-tool` 在自己的 turn-context 定义里就是这么匹配的（`…\dsh-client-ui-tool\lib\client.js` 的 `match` 同时认 `tool/call` 和 `tool/ptc-dispatch-start`），turn 注册表对每个定义都调 `match(event)`，没有类型白名单。
+
+测试：`scripts/client-check.mjs` 新增第 14 节，用真实的 `tool/ptc-dispatch` 形状（含 `rootCallId` / `subCallId` / `arguments`）驱动——派发的 `learn` 必须渲染出一行、行里要有 `tool-recovery` 和那句被引用的话、派发的 `read` / `grep` 不留痕、派发的拒收必须是 `未写入`、`isError` 必须是红色且不带落点、只来 `-start` 什么都不出、派发的建技能与删除各自走对文案。**把那行 `match` 删掉，这一节就红。**
+
+`scripts/selftest.mjs` 的 `safety` 一节补了 4 条**接线断言**（读 `lib/index.js` / `lib/client.js` 的源码文本），并明说这是弱的：宿主接线在 `apply()` 里，需要活的 Cordis 上下文才能跑，所以这里只能钉住「那两行还在、两处答复共用一个函数」；真正证明行为的是 client-check 第 14 节。
+
+顺带查出一个真缺陷：`capture.sessions` **从不淘汰已经结束的会话**，于是每次 `scheduleReview()` 都会把进程见过的每个会话重走一遍，并各追加一行 `filedCount: 0, skippedCount: 0` 的空账本——每轮都空转一次，账本还在长。
 
 ---
 
@@ -420,7 +452,7 @@ v0.3.4 把措辞修对了，但那一行仍然只报**类别**：
 
 它**不替换**任何工具输出，也不假装自己比工具更权威：回执里出现的每一条，都能在同回合的工具调用里找到出处。
 
-**它没被证明的部分，说清楚**：`scripts/client-check.mjs` 证明的是折叠逻辑——430 条断言全部跑在真实的 `lib/client.js` 上（假的 `window.__ModuleLoader__`，`require` 只认 `react/jsx-runtime`，别的都抛）。它**没有**证明外观：这里没有浏览器，而模拟渲染器不能替代真的看一眼。第一次真机上看到的回执长什么样，以你自己的眼睛为准。
+**它没被证明的部分，说清楚**：`scripts/client-check.mjs` 证明的是折叠逻辑——443 条断言全部跑在真实的 `lib/client.js` 上（假的 `window.__ModuleLoader__`，`require` 只认 `react/jsx-runtime`，别的都抛）。它**没有**证明外观：这里没有浏览器，而模拟渲染器不能替代真的看一眼。第一次真机上看到的回执长什么样，以你自己的眼睛为准。
 
 （v0.3.1 在这段里写过「含 11 个注入缺陷的变异测试，10 个被抓出，剩下 1 个是等价变异体」。那是作者手工做变异测试时的一次记事，`client-check.mjs` 里**没有任何变异机制**。把一次性的过程说成这个脚本的能力，还正好写在「说清楚没被证明的部分」这一段里——所以删掉，经过见 v0.3.2 缺陷表的第 50 条。）
 
@@ -560,8 +592,8 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-597/597 checks passed — all green
-430/430 checks passed
+608/608 checks passed — all green
+443/443 checks passed
 ```
 
 「真实对话里的假阳性回归」那一节把**跑挂过插件的原话逐字抄进去**当夹具（含那 240 字的 PowerShell 脚本原文、

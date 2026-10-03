@@ -558,6 +558,83 @@ eq('the hover text keeps the rule whole', longEntries[0].props.title, `${longPre
 ok('the visible text still names the skill', longEntries[0].props.children.startsWith(`${dictionaries.zh['note.technique']} → tool-recovery`), { text: longEntries[0].props.children });
 eq('the English cut behaves the same', entriesOf(render(longNote, 'en'))[0].props.children.length, longPrefixEn.length + 80);
 
+// ---------------------------------------------------------------- 14. the ptc preset
+// Under the `ptc` agent preset the model's only top-level tool is `run_code`, so a `learn`
+// call never arrives as a `tool/call` and has no `tool/result` at all: ONE
+// `tool/ptc-dispatch` event carries the name, the arguments and the answer together.
+//
+// This is measured, not imagined. The live session
+// `--D-Download-youtube-ambilight-2.38.17--/session-c5cbe2d7-b502-4df9-8a44-de41cb9753e0`
+// holds 471 `tool/call` events — every single one of them `run_code` — and 939
+// `tool/ptc-dispatch` events, 33 of which were `learn`; 16 of those wrote a rule. The recap
+// rendered nothing for that whole workspace, because `match` only knew `tool/call`. Every
+// assertion below is a wall against that silence coming back.
+function dispatch(turn, name, args, failed, text) {
+  return {
+    type: 'tool/ptc-dispatch',
+    data: {
+      turn,
+      rootCallId: 'call_root',
+      parentCallId: 'call_root',
+      subCallId: 'call_root:ptc:1',
+      name,
+      arguments: typeof args === 'string' ? args : JSON.stringify(args),
+      isError: failed === true,
+      ...(typeof text === 'string' ? { content: [{ type: 'text', text }] } : {}),
+    },
+  };
+}
+
+const ptc = publish(fold([
+  startEvent(90),
+  // The other 906 dispatches are tools this recap does not report, and they must cost nothing.
+  dispatch(90, 'read', { file_path: 'D:\\x\\a.js' }, false, 'file body'),
+  dispatch(90, 'grep', { pattern: 'x' }, false, 'no match'),
+  dispatch(90, 'learn', { action: 'note', kind: 'technique', statement: '先用 `node --check` 过一遍再提交', umbrella: 'tool-recovery' }, false,
+    '已写入 tool-recovery 的规则 lmz9da：先用 `node --check` 过一遍再提交\n文件 C:\\Users\\admin\\.dsh\\skills\\learned\\tool-recovery\\SKILL.md'),
+]).state, 90);
+ok('a dispatched learn call earns a line at all', ptc !== null && ptc.value.entries.length === 1, { entries: ptc?.value?.entries });
+eq('and it names the skill the rule went into', ptc.value.entries[0].target, 'tool-recovery');
+eq('and quotes the rule that landed', ptc.value.entries[0].detail, '先用 `node --check` 过一遍再提交');
+eq('and it is a write, not a refusal', ptc.value.entries[0].failed, false);
+ok('the line reads exactly like the tool/call one would',
+  noteLine(ptc).includes('已记下一条做法 → tool-recovery：先用 `node --check` 过一遍再提交'), { line: noteLine(ptc) });
+ok('a dispatched tool this recap does not report leaves no trace',
+  !texts(render(ptc, 'zh')).some((line) => line.includes('a.js') || line.includes('no match')), { lines: texts(render(ptc, 'zh')) });
+
+// A refusal inside `run_code` is still a refusal: the same sentence decides it either way.
+const ptcRefused = publish(fold([
+  startEvent(91),
+  dispatch(91, 'learn', { action: 'note', kind: 'durable-fact', statement: '太笼统' }, false, `未写入：${REFUSED_REASON}\n门槛明细：actionable=false`),
+]).state, 91);
+eq('a dispatched refusal is not painted green', ptcRefused.value.entries[0].failed, true);
+ok('and it still says why', noteLine(ptcRefused).includes(REFUSED_REASON), { line: noteLine(ptcRefused) });
+
+// The host marks a dispatch that threw at `data.isError`, not at `message.isError`.
+const ptcError = publish(fold([
+  startEvent(92),
+  dispatch(92, 'learn', { action: 'note', kind: 'technique', statement: 'x' }, true, 'Error: boom'),
+]).state, 92);
+eq('a dispatch the host marked failed is an error, not a write', ptcError.value.entries[0].tone, 'error');
+eq('and it invents no destination', ptcError.value.entries[0].target, '');
+
+// `tool/ptc-dispatch-start` announces the same call before it runs. Folding that too would
+// print every line twice, so `match` must leave it alone.
+const ptcStart = publish(fold([
+  startEvent(93),
+  { type: 'tool/ptc-dispatch-start', data: { turn: 93, name: 'learn', arguments: JSON.stringify({ action: 'note', kind: 'technique', statement: 'x' }) } },
+]).state, 93);
+ok('the announcing event alone prints nothing', ptcStart === null || ptcStart.value.entries.length === 0, { value: ptcStart?.value });
+
+// The preset hides EVERY tool, not just `learn` — so the skill verbs have to survive it too.
+const ptcSkill = publish(fold([
+  startEvent(94),
+  dispatch(94, 'learn_skill_manage', { action: 'create', name: 'tool-recovery' }, false, "技能 'tool-recovery' 已创建"),
+  dispatch(94, 'learn_skill_manage', { action: 'delete', name: 'old-one' }, false, "技能 'old-one' 已删除（归档里还留着一份，能移回来）"),
+]).state, 94);
+eq('a dispatched skill create is reported', ptcSkill.value.entries[0].key, 'skill.create');
+eq('a dispatched unconfirmed delete still says the copy is on disk', ptcSkill.value.entries[1].key, 'skill.delete.recoverable');
+
 // ---------------------------------------------------------------- report
 console.log(`${checks - failures.length}/${checks} checks passed`);
 if (failures.length > 0) {
