@@ -192,7 +192,7 @@ eq('rendered as label + 2 entries + 2 separators', lines7.length, 5);
 eq('leading label in zh', lines7[0], '学习');
 eq('separator', lines7[1], '·');
 eq('first sentence', lines7[2], "技能 'tool-recovery' 已创建");
-eq('second sentence', lines7[4], '记住一条用户要求');
+eq('second sentence', lines7[4], '已记下一条用户要求');
 const en7 = texts(render(v7, 'en'));
 eq('leading label in en', en7[0], 'learn');
 eq('first sentence in en', en7[2], "skill 'tool-recovery' created");
@@ -347,7 +347,7 @@ eq('turn 50 entry is its own', publish(a.state, 50).value.entries[0].name, 'a');
 // The audit that produced this section measured the live session log: a refused
 // `learn action=note` and a successful one BOTH arrive with `isError=false`. If the recap
 // only reads `isError`, the one case the user needs to see — the gate refused the lesson —
-// renders as the green "记住一条做法" line. These assertions pin the refusal path, and the
+// renders as the green "已记下一条做法" line. These assertions pin the refusal path, and the
 // first one pins the marker itself against the module that writes it, so the two files
 // cannot drift apart without a red test.
 const toolsSource = readFileSync(join(HERE, '..', 'lib', 'tools.js'), 'utf8');
@@ -364,8 +364,8 @@ const refusedTurn = fold([
 ]);
 const refusedValue = publish(refusedTurn.state, 60);
 const refusedLine = texts(render(refusedValue, 'zh')).join(' ');
-ok('a refused note renders as a refusal, not as a write', !refusedLine.includes('记住一条做法'), { line: refusedLine });
-ok('and it says the rule was not saved', refusedLine.includes('做法没能记下'), { line: refusedLine });
+ok('a refused note renders as a refusal, not as a write', !refusedLine.includes('已记下一条做法'), { line: refusedLine });
+ok('and it says the rule was not saved', refusedLine.includes('没能记下这条做法'), { line: refusedLine });
 eq('a refusal is amber, not green', refusedValue.value.entries[0].tone, 'warn');
 eq('and it is still one entry', refusedValue.value.entries.length, 1);
 ok('the English copy is a refusal too', texts(render(refusedValue, 'en')).join(' ').includes('could not save the technique'));
@@ -376,7 +376,7 @@ const wroteTurn = fold([
   result(61, 'c1', false, '已写入 tool-recovery 的规则 1xe1nh6：有效做法：先用 `node --check` 再提交'),
 ]);
 const wroteValue = publish(wroteTurn.state, 61);
-ok('a note that landed still renders as a write', texts(render(wroteValue, 'zh')).join(' ').includes('记住一条做法'));
+ok('a note that landed still renders as a write', texts(render(wroteValue, 'zh')).join(' ').includes('已记下一条做法'));
 eq('and it stays green', wroteValue.value.entries[0].tone, 'success');
 eq('and it is not marked failed', wroteValue.value.entries[0].failed, false);
 
@@ -410,6 +410,45 @@ const hardDelete = fold([
 const hardLine = texts(render(publish(hardDelete.state, 71), 'zh')).join(' ');
 ok('a confirmed delete does say it is for good', hardLine.includes('永久删除'), { line: hardLine });
 ok('and the English copy distinguishes them as well', texts(render(publish(softDelete.state, 70), 'en')).join(' ').includes('stays in the archive'));
+
+// ---------------------------------------- 12. a save and a refusal are one sentence
+//
+// 0.3.3 printed 「记住一条做法」 for a save and 「做法没能记下」 for a refusal — in the same
+// line. The harness's own activity copy never does that: it keys ONE label table by state
+// (`已加载技能` / `技能加载失败`, `apps/desktop/src/i18n/zh.ts:4947-4956`), so the sentence
+// keeps its shape and only the state word moves. These assertions hold the Chinese to the
+// same shape as the English sitting next to it: one verb, one object, and the outcome
+// marker is the only thing that differs.
+const noteObject = (text) =>
+  text
+    .replace(/^已记下/, '')
+    .replace(/^没能记下/, '')
+    .replace(/^(?:这)?(?:一)?条/, '');
+const NOTE_KINDS = [
+  'note.remember-request',
+  'note.user-correction',
+  'note.user-preference',
+  'note.durable-fact',
+  'note.technique',
+  'note.recovered-failure',
+  'note.skill-wrong',
+  'note.plain',
+];
+for (const key of NOTE_KINDS) {
+  const saved = dictionaries.zh[key];
+  const refused = dictionaries.zh[`${key}.failed`];
+  ok(`${key}: the save reads as done`, typeof saved === 'string' && saved.startsWith('已') && saved.includes('记下'), { saved });
+  ok(`${key}: the refusal reads as the same verb, not as done`, typeof refused === 'string' && refused.includes('记下') && !refused.startsWith('已'), { refused });
+  ok(`${key}: neither state is an imperative`, !/^记(住|下)/.test(saved) && !/^记(住|下)/.test(refused), { saved, refused });
+  ok(`${key}: both states name the same thing`, noteObject(saved) === noteObject(refused), { saved, refused, objects: [noteObject(saved), noteObject(refused)] });
+}
+
+// The two delete outcomes fail for the same reason, so they say the same thing — in en too.
+eq('both delete failures read the same in zh', dictionaries.zh['skill.delete.recoverable.failed'], dictionaries.zh['skill.delete.failed']);
+eq('both delete failures read the same in en', dictionaries.en['skill.delete.recoverable.failed'], dictionaries.en['skill.delete.failed']);
+for (const key of ['learn.undo', 'learn.consolidate', 'learn.organize']) {
+  ok(`${key} is a report, not an order`, dictionaries.zh[key].startsWith('已'), { text: dictionaries.zh[key] });
+}
 
 // ---------------------------------------------------------------- report
 console.log(`${checks - failures.length}/${checks} checks passed`);
