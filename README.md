@@ -13,7 +13,7 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 21 节 608 条断言，浏览器半边 443 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 21 节 612 条断言，浏览器半边 443 条，零依赖 |
 
 ---
 
@@ -274,7 +274,7 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 - `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
 - 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
 
-自检现在 **21 节 608 条断言**（浏览器半边 443 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+自检现在 **21 节 612 条断言**（浏览器半边 443 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
 
 ### v0.3.2：变异测试没抓住的那几个守卫
 
@@ -371,6 +371,50 @@ v0.3.4 把措辞修对了，但那一行仍然只报**类别**：
 顺带查到一件事，这里要说准确，因为作者第一版就说错了：`capture.sessions` **是有上限的**——`capture.maxSessions`（默认 8）按 `updatedAt` 做 LRU 淘汰（`lib/capture.js` 的 `#prune()`），不是「从不淘汰」。准确的说法是：**会话结束时没有单独的淘汰时机**，一个已经聊完的会话只要还占着那 8 个名额，每次 `scheduleReview()` 就都会把它整个窗口重走一遍，并追加一行 `filedCount: 0, skippedCount: 0` 的空账本。拿 youtube-ambilight 那四个会话验过：同一个窗口被反复 propose，**主会话 38 行、三个 subagent 各 37–38 行**，每一行都是 0。所以这是**空转与账本噪声**（有上限、有轮转），不是内存泄漏，也不是丢学习。
 
 **这一条故意没改**：给 `scheduleReview()` 加一句「窗口没变就跳过」能省掉大量无用功，但那正好是「学习悄悄不再发生」这类故障的完美藏身处——作者刚刚才被这一类故障咬过一次。要改它，前提是先有一个能证明「新观测一定会被看见」的测试，而不是先有一个省事的开关。
+
+### v0.3.7：四个工作模式里，有一个听不到纪律
+
+上一个问题接着往下问了一句：四个工作模式的工作区都适配了吗？
+
+**四个工作模式就是四个内置 agent preset**，都在 `…/deepseek-ai/dsh-web-app/presets/` 里，一个 preset 一份 YAML：
+
+| preset | order | 它改了什么 | 回执能看见吗 | 纪律送得到吗 |
+| --- | --- | --- | --- | --- |
+| `standard` | 1 | 什么也不改，就是宿主默认那套 | 能（`tool/call`） | 能 |
+| `ptc` | 2 | 模型手里只剩 `run_code`，别的工具在它里面派发 | **v0.3.6 之前不能**，修好了 | 能 |
+| `minimal` | 3 | persona `complete: true` + `includeRuntimeContext: false`，只有一条持久 shell | 能 | **不能** |
+| `cordis` | 4 | 额外给 `tool-cordis`、带 `customSkillDirs` 的 `skill-filesystem`，并打开 `tool-workflow` / `tool-ralph` | 能（`tool/call`） | 能 |
+
+（本机还有两个自定义 preset：`liangshen` 和 `Minimal (Windows)`。前者没有 `complete`，正常；后者抄了内置 `minimal` 的 `complete: true`，和它一样。）
+
+**`minimal` 那一格为什么是不能**，这件事值得写下来，因为它不是本插件的 bug，也不是能靠改本插件绕开的：
+
+```js
+// @deepseek-ai/dsh-system-prompt/lib/index.js:335-361
+const completeSections = sectionDefinitions.filter((section) => section.complete === true);
+if (completeSections.length > 1) throw new Error(`multiple complete prompt sections are active: …`);
+…
+return { ...transformed, sections: completeSection === void 0 ? transformed.sections : [completeSection] };
+```
+
+`complete: true` 的 persona 会把装配结果**压成那一段**——系统提示里除它以外什么都不剩。`dsh-learn` 的 `learn-discipline` 和 `learn-queue` 都在被丢掉的那一堆里；`includeRuntimeContext: false` 连 `contexts` 也一起清空（`:348` 与 `:360`）。这是宿主级的设计：那个模式下**每个插件**的提示词贡献都会消失，不只是这一个。
+
+而工具目录不受影响。同一个 `assemble()` 在 `:319` 把 `[...this.layers.global.toolProviders.values(), ...scopeLayers.flatMap(…)]` 拼起来，profile 级 bundle 注册的工具**无条件进每一个 preset**；`minimal.patch.yml` 自己也**没有**任何过滤工具目录的声明（它就一个 persona 加一组持久 shell）。所以那个模式里五个 `learn*` 工具**照样能调**——缺的只是「什么时候该调」这句话。
+
+**于是把纪律搬了一份到唯一搬不走的地方：`learn` 工具自己的 description。** 工具目录是每个 preset 都会合并的表面，description 也就是唯一在每个模式下都看得见的表面。加的是同一套触发条件（「记住 / 以后都 / 别再」→ `remember-request`；刚修好报错 → `recovered-failure`；顺手有效 → `technique`；本机固定事实 → `durable-fact`），加反引号规则，加 `200` 字上限——数字和提示词、门槛用的是同一个 `ACTIONABLE_MAX_CHARS`。
+
+`scripts/selftest.mjs` 的 `host` 一节补了 4 条断言，钉住这份副本不会在某次改写里悄悄消失：description 里必须还有 `action=note`、四个 kind 一个不少、反引号规则、以及 `200 字` 这个数字。
+
+同一天量出来的分布，说明这四个模式不是纸面上的（解开 `~/.dsh/sessions` 下每个 `session.v4.jsonl.zstd`，按会话头里的 `agentPreset` 归类）：
+
+| preset | 会话数 | `learn*` 调用 |
+| --- | --- | --- |
+| `standard` | 34 | 97 |
+| `ptc` | 19 | 20 |
+| `cordis` | 7 | 47 |
+| `code` | 5 | **0** |
+
+`code` 是这一版里已经不存在的 preset id（`app.asar` 里搜不到任何 `preset-code`）——那 5 个会话是旧的，不是第五种模式。`minimal` / `liangshen` / `minimal-windows` 各自 **0 个会话**：没人用过，所以这一格是**潜在缺口，不是已经发生的事故**，和 `ptc` 那次不一样。
 
 ---
 
@@ -594,7 +638,7 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-608/608 checks passed — all green
+612/612 checks passed — all green
 443/443 checks passed
 ```
 

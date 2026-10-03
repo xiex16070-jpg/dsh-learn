@@ -2004,7 +2004,7 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
   // monotonic, so a false positive is not a nuisance, it is a tool the model
   // cannot use at all.
   const home = makeHome('host-hooks');
-  const { skills, managed, store } = makeWorld(home);
+  const { skills, managed, store, tools } = makeWorld(home);
   const learned = skills.learnedDir;
   const flat = join(home, 'skills');
   managed.claim('mine', { kind: 'umbrella', source: 'test', file: join(flat, 'mine', 'SKILL.md') });
@@ -2119,6 +2119,31 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
     'and the length cap, with the number the gate really uses',
     new RegExp(`${ACTIONABLE_MAX_CHARS} 字`).test(DISCIPLINE_SECTION),
     DISCIPLINE_SECTION,
+  );
+
+  // ------------------------------------------- the surface presets cannot drop
+  // A preset whose persona sets `complete: true` — the shipped `minimal`, and
+  // this machine's `minimal-windows` — makes that persona the SOLE assembled
+  // prompt section: `dsh-system-prompt`'s `assemble()` ends with
+  // `sections: completeSection === void 0 ? transformed.sections : [completeSection]`,
+  // and `includeRuntimeContext: false` empties `contexts` too. So in that mode
+  // neither DISCIPLINE_SECTION nor the queue nudge reaches the model, while the
+  // five learn tools stay callable (`minimal.patch.yml` declares no tool filter,
+  // and the catalog merges `layers.global.toolProviders` unconditionally). The
+  // tool description is therefore not documentation — it is the fallback, and
+  // it has to carry the same rules on its own.
+  const learnDescription = tools.learn.description;
+  check('the learn tool states the trigger, for presets that drop the prompt', /action=note/.test(learnDescription));
+  check(
+    'and names every kind it is meant to be used for',
+    ['remember-request', 'recovered-failure', 'technique', 'durable-fact'].every((kind) => learnDescription.includes(kind)),
+    learnDescription,
+  );
+  check('and repeats the backtick rule the gate enforces', /反引号/.test(learnDescription));
+  check(
+    'and the same length number as the prompt and the gate',
+    new RegExp(`${ACTIONABLE_MAX_CHARS} 字`).test(learnDescription),
+    learnDescription,
   );
   wired.dispose();
   sameList('disposal reaches every registration', disposed.sort(), ['guard', 'learn-discipline', 'learn-queue']);
