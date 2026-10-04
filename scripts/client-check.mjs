@@ -359,7 +359,7 @@ eq('turn 50 entry is its own', publish(a.state, 50).value.entries[0].name, 'a');
 // cannot drift apart without a red test.
 const toolsSource = readFileSync(join(HERE, '..', 'lib', 'tools.js'), 'utf8');
 const clientSource = readFileSync(TARGET, 'utf8');
-const refusedLiteral = /\[`(未写入)：\$\{result\.reason\}`/.exec(toolsSource)?.[1];
+const refusedLiteral = /`(未写入)：\$\{result\.reason\}`/.exec(toolsSource)?.[1];
 ok('lib/tools.js still writes a stable refusal marker', typeof refusedLiteral === 'string' && refusedLiteral.length > 0);
 const clientMarker = /const REFUSED_PREFIX = '([^']+)'/.exec(clientSource)?.[1];
 eq('and the recap reads the same marker', clientMarker, refusedLiteral);
@@ -367,7 +367,7 @@ eq('and the recap reads the same marker', clientMarker, refusedLiteral);
 const refusedTurn = fold([
   startEvent(60),
   call(60, 'c1', 'learn', { action: 'note', kind: 'technique', statement: '把 Tee-Object 接在 Select-Object 后面' }),
-  result(60, 'c1', false, '未写入：缺少可迁移的做法或具体对象（不是一条能照做的规则）\n门槛明细：general=ok；actionable=这条不合格'),
+  result(60, 'c1', false, '未写入：缺少可迁移的做法或具体对象（不是一条能照做的规则）\n门槛明细：general=ok；actionable=not-actionable'),
 ]);
 const refusedValue = publish(refusedTurn.state, 60);
 const refusedLine = texts(render(refusedValue, 'zh')).join(' ');
@@ -376,6 +376,17 @@ ok('and it says the rule was not saved', refusedLine.includes('没能记下这�
 eq('a refusal is amber, not green', refusedValue.value.entries[0].tone, 'warn');
 eq('and it is still one entry', refusedValue.value.entries.length, 1);
 ok('the English copy is a refusal too', texts(render(refusedValue, 'en')).join(' ').includes('could not save the technique'));
+
+// The audience mismatch, in one assertion. The gate's reason is written for the MODEL — it has
+// to explain how to pass, so it runs to about ninety characters — and the footnote is forty.
+// Rendering the sentence meant every refusal arrived cut mid-word, which the user read as
+// `没能记下这条做法：具体对象有，但太长了：240 字……拆成几条，每条一句、200…`. So the code is what
+// the line shows and the reason is what the tooltip shows.
+eq('a refusal shows the CODE label, not the gate sentence', refusedValue.value.entries[0].code, 'not-actionable');
+ok('and the label is what the user reads', texts(render(refusedValue, 'zh')).join(' ').includes('没能记下这条做法：读不出可迁移的做法'), { line: refusedLine });
+ok('the gate sentence is not in the visible text', !refusedLine.includes('不是一条能照做的规则'), { line: refusedLine });
+ok('but the whole sentence is in the hover text', entriesOf(render(refusedValue, 'zh'))[0].props.title.includes('不是一条能照做的规则'), { title: entriesOf(render(refusedValue, 'zh'))[0].props.title });
+ok('and the English label is a label', entriesOf(render(refusedValue, 'en'))[0].props.children.includes('no transferable technique'), { text: entriesOf(render(refusedValue, 'en'))[0].props.children });
 
 const wroteTurn = fold([
   startEvent(61),
@@ -544,19 +555,30 @@ eq('and it is counted', repeated.value.entries[0].count, 2);
 ok('the count is visible', noteLine(repeated).includes('×2'), { line: noteLine(repeated) });
 
 // A rule may be as long as `ACTIONABLE_MAX_CHARS` (200). The cut is display-only, so the two
-// things worth seeing stay on one row and the whole sentence is one hover away.
+// things worth seeing stay on one row and the whole sentence is one hover away — and it lands
+// on a CLAUSE boundary rather than at a character count, because `slice(0, 79) + '…'` in
+// Chinese almost always stops inside a word. The user read exactly that: `…超过 200…`.
 const LONG_RULE =
   '把 `docs/make-shots.py` 里的路径折叠规则放在 `pretty()` 的最后一步，否则绝对路径会先被 `SUBS` 折成 `C:`；这一条故意写得比八十个字还要长，用来验证展示会截断而 hover 不会';
+const CLAUSE_MARKS = ['：', '；', '。', '，', '、', '—', ' ', ': ', '; ', ', '];
 const longNote = noteTurn(87, [{ text: `已写入 tool-recovery 的规则 1long01：${LONG_RULE}` }]);
 const longEntries = entriesOf(render(longNote, 'zh'));
 const longPrefix = `${dictionaries.zh['note.technique']}${dictionaries.zh['detail.target'].replace('{name}', 'tool-recovery')}${dictionaries.zh['detail.text'].replace('{text}', '')}`;
 const longPrefixEn = `${dictionaries.en['note.technique']}${dictionaries.en['detail.target'].replace('{name}', 'tool-recovery')}${dictionaries.en['detail.text'].replace('{text}', '')}`;
-eq('one entry with a 100-character rule is exactly one span', longEntries.length, 1);
-eq('the visible text is cut to DETAIL_MAX_CHARS', longEntries[0].props.children.length, longPrefix.length + 80);
-ok('the cut is marked', longEntries[0].props.children.endsWith('…'), { text: longEntries[0].props.children });
+const longVisible = longEntries[0].props.children.slice(longPrefix.length);
+const longBody = longVisible.slice(0, -1);
+eq('one entry with a long rule is exactly one span', longEntries.length, 1);
+ok('the visible text is cut to the budget', longVisible.length <= 41, { visible: longVisible });
+ok('and the cut is marked', longVisible.endsWith('…'), { visible: longVisible });
+ok(
+  'and it lands on a clause boundary, not inside a word',
+  CLAUSE_MARKS.includes(LONG_RULE.charAt(longBody.length)),
+  { visible: longVisible, next: LONG_RULE.charAt(longBody.length) },
+);
 eq('the hover text keeps the rule whole', longEntries[0].props.title, `${longPrefix}${LONG_RULE}`);
 ok('the visible text still names the skill', longEntries[0].props.children.startsWith(`${dictionaries.zh['note.technique']} → tool-recovery`), { text: longEntries[0].props.children });
-eq('the English cut behaves the same', entriesOf(render(longNote, 'en'))[0].props.children.length, longPrefixEn.length + 80);
+const longVisibleEn = entriesOf(render(longNote, 'en'))[0].props.children.slice(longPrefixEn.length);
+ok('the English cut behaves the same', longVisibleEn.length <= 41 && longVisibleEn.endsWith('…'), { visible: longVisibleEn });
 
 // ---------------------------------------------------------------- 14. the ptc preset
 // Under the `ptc` agent preset the model's only top-level tool is `run_code`, so a `learn`
@@ -634,6 +656,25 @@ const ptcSkill = publish(fold([
 ]).state, 94);
 eq('a dispatched skill create is reported', ptcSkill.value.entries[0].key, 'skill.create');
 eq('a dispatched unconfirmed delete still says the copy is on disk', ptcSkill.value.entries[1].key, 'skill.delete.recoverable');
+
+// ------------------------------------------------- 15. one refusal code, three places
+//
+// A refusal code has to exist in three places to reach the user: `REFUSAL_CODES` in
+// `lib/text.js` (the host half picks one), `REFUSAL_CODES` in `lib/client.js` (the renderer
+// refuses to label a code it does not know) and the `refusal.<code>` key in BOTH dictionaries.
+// The browser half is a separate bundle and cannot import the host module, so the only thing
+// standing between a new gate code and `refusal.some-new-code` printed at the user is this
+// section. Every one of the three is compared to the other two.
+const { REFUSAL_CODES: hostCodes } = await import(pathToFileURL(join(HERE, '..', 'lib', 'text.js')).href);
+const clientCodes = [...(/const REFUSAL_CODES = \[([\s\S]*?)\];/.exec(clientSource)?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1]);
+const zhCodes = Object.keys(dictionaries.zh).filter((key) => key.startsWith('refusal.')).map((key) => key.slice('refusal.'.length));
+const enCodes = Object.keys(dictionaries.en).filter((key) => key.startsWith('refusal.')).map((key) => key.slice('refusal.'.length));
+const sorted = (list) => [...list].sort().join(',');
+eq('the browser half knows every code the host can refuse with', sorted(clientCodes), sorted(hostCodes));
+eq('and the Chinese table labels every one of them', sorted(zhCodes), sorted(hostCodes));
+eq('and so does the English table', sorted(enCodes), sorted(hostCodes));
+ok('the code list was actually read out of the source', clientCodes.length > 10, { count: clientCodes.length });
+ok('every label is short enough to be a footnote', hostCodes.every((code) => dictionaries.zh[`refusal.${code}`].length <= 20 && dictionaries.en[`refusal.${code}`].length <= 40), { longest: hostCodes.map((code) => dictionaries.en[`refusal.${code}`]).sort((a, b) => b.length - a.length)[0] });
 
 // ---------------------------------------------------------------- report
 console.log(`${checks - failures.length}/${checks} checks passed`);

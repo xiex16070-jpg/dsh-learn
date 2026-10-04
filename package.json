@@ -1,6 +1,6 @@
 {
   "name": "dsh-learn",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Persistent learning for DSH: post-turn review turns a session's corrections, failures and fixes into reusable skills; an idle curator keeps the learned library healthy",
   "type": "module",
   "main": "lib/index.js",

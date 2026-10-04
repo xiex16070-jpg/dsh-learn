@@ -187,8 +187,13 @@ function makeHome(name) {
 }
 
 /** The whole dependency graph over one home, exactly as index.js wires it. */
-function makeWorld(home) {
-  const config = normalizeConfig({ dshHome: home });
+/**
+ * A whole plugin in a throwaway home. `overrides` is merged into the raw config
+ * before normalisation, which is how a test reaches a limit it would otherwise
+ * have to satisfy 24 times over (`review.ruleBudget`).
+ */
+function makeWorld(home, overrides = {}) {
+  const config = normalizeConfig({ dshHome: home, ...overrides });
   const store = createStore({ root: config.dataDir });
   const managed = createManaged({ store });
   const skills = createSkills({
@@ -912,6 +917,105 @@ start('capture — what is allowed into the window');
   eq('a fresh session has no window', capture.window('nope'), null);
 }
 
+// ====================================== 5b. the plainest sentences still count
+//
+// The largest hole the plugin has ever had, and it was invisible because every
+// existing fixture was written in the banks' own vocabulary. The four user-side
+// pattern banks are keyed on about fifteen Chinese phrasings; a probe of
+// ordinary sentences (2026-10-04) got 2 of 8 through `classifyText`. Losing a
+// sentence there is worse than losing it at the gate: `recordUserMessage`
+// returns null BEFORE `#push`, so the sentence never enters the window at all,
+// `win.turn` still increments, `triggerObservations: 3` is never reached and
+// `scheduleReview()` never fires. The user said 「这几轮对话还是没有任何学习」
+// and this is the mechanism.
+//
+// Every sentence below is a REAL line the user wrote in this workspace. They are
+// pinned one by one, because the failure mode is silence: a bank that stops
+// recognising a phrasing produces no error, no ledger row, and no footnote.
+start('text — the user\'s own words, in their own idioms');
+{
+  // Each entry is [sentence, the kind it must raise]. The kind matters, not just
+  // "something": USER_CORRECTION goes through the queue, REMEMBER_REQUEST writes
+  // immediately, and DURABLE_FACT routes to `environment-facts`.
+  const PLAIN = [
+    ['别再拿 robocopy 做镜像了，上次它把 `docs/shots` 目录清空了。', 'USER_CORRECTION'],
+    ['以后提交前都先跑 `node scripts\\selftest.mjs`，红了不要提交。', 'USER_CORRECTION'],
+    ['别再用 `Set-Content` 改文件了，它会把 UTF-8 的 BOM 带上。', 'USER_CORRECTION'],
+    ['这个仓库的 `README.md` 里数字要跟着 `selftest.mjs` 一起改，改一处不够。', 'DURABLE_FACT'],
+    ['还有：`learn_skill_manage` 写入前会先过一遍内容卫生，别绕开它。', 'USER_CORRECTION'],
+    ['本机 Python 在 `C:\\Users\\admin\\.dsh\\dsh-runtimes\\dsh-primary-runtime\\dependencies\\python\\python.exe`。', 'DURABLE_FACT'],
+    ['youtube-ambilight 这个工作区里截图放在 `docs\\shots\\` 下。', 'DURABLE_FACT'],
+    ['跑测试用 `node scripts\\selftest.mjs`。', 'DURABLE_FACT'],
+    ['这个项目发布用的是 `gh release create`，不是 `git push --tags`。', 'DURABLE_FACT'],
+    ['我想让你以后回复都用中文，不要夹英文。', 'USER_PREFERENCE'],
+    // Found by sampling the real corpus, not invented: 「`dsh` 是 deepseek
+    // harness，`D:\` 的旧版本构建已经无用，但 `C:\` 的正式桌面端还要用」 was invisible,
+    // and it is exactly what the `environment-facts` umbrella exists to hold.
+    ['`dsh` 是 deepseek harness，`D:\\` 的旧版本构建已经无用，但 `C:\\` 的正式桌面端还要用。', 'DURABLE_FACT'],
+  ];
+  for (const [sentence, kind] of PLAIN) {
+    const kinds = classifyText(sentence, { source: 'user' });
+    eq(`plain user sentence raises ${kind}`, kinds[0] || '(nothing)', kind);
+  }
+
+  // The fallback has to be narrower than "any user message with backticks",
+  // or it re-opens the hole v0.3.2 closed: one-turn task instructions must not
+  // become durable facts. These are the sentences from that measurement.
+  const NOT_LESSONS = [
+    '把 `lib/text.js` 的 `DETAIL_MAX_CHARS` 改成 40。',
+    '在 `lib/client.js` 里加上 `refusalLabel` 函数。',
+    '这一次先只改 `lib/text.js`，别的文件不要动。',
+    '`lib/text.js` 里 `ACTIONABLE_MAX_CHARS` 现在是多少？',
+    '我刚读了 `lib/text.js`，接下来准备改 `classifyText`。',
+    // Measured against the whole real corpus, not invented: the first four of
+    // these reached the window when the fallback was looser, and every extra
+    // one is a queue slot the model has to read and throw away.
+    '读取 `D:\\download\\要求.txt`，结合你自己的代码尝试完成要求中的工作。',
+    '参考 `https://learn.microsoft.com/edge/extensions/publish` 这里的说明，把 `manifest.json` 补全。',
+    'You are doing read-only research for a submission. Do NOT modify any file.',
+  ];
+  for (const sentence of NOT_LESSONS) {
+    const kinds = classifyText(sentence, { source: 'user' });
+    eq(`a task instruction stays invisible: ${sentence.slice(0, 18)}`, kinds.length, 0);
+  }
+
+  // A pasted environment error is evidence, never a lesson. Hermes files this
+  // class under 「环境相关的偶发失败」 — write how to install or configure, never
+  // that a thing is absent. The sentence still classifies; the GATE is what has
+  // to refuse it, and 「may not exist」 / 「no access to」 is how it arrives.
+  const modelError = "报错信息： There's an issue with the selected model (stealth/ox-alpha). It may not exist or you may not have access to it.";
+  const modelGate = gateObservation({ statement: modelError, kind: 'DURABLE_FACT', source: 'user' });
+  eq('a missing-tool error is refused as environment state', modelGate.ok, false);
+  eq('and the env-state code is what refuses it', modelGate.codes.includes('env-state'), true);
+
+  // A rule that carries its own WHY is the shape Hermes's `_LESSON_LAYER_BLOCK`
+  // asks for — 「a generalizable rule + one clause of WHY (the mechanism)」. The
+  // gate used to refuse it as an incident report purely because it said 上次.
+  const withWhy = '别再拿 robocopy 做镜像了，上次它把 `docs/shots` 目录清空了。';
+  const whyGate = gateObservation({ statement: withWhy, kind: 'USER_CORRECTION', source: 'user' });
+  eq('a rule with its mechanism passes the gate', whyGate.ok, true);
+  eq('and the incident refusal is not what it hits', whyGate.codes.includes('incident'), false);
+  // Negative control: the same vocabulary in a sentence that only narrates.
+  eq('a bare narrative is still an incident', looksLikeIncidentReport('上次构建失败了，我还没查出来为什么。'), true);
+  eq('and a rule with a why is not', looksLikeIncidentReport(withWhy), false);
+  eq('and a clean rule is not either', looksLikeIncidentReport('改完 `lib/text.js` 先跑 `node --check`。'), false);
+
+  // 临时 used to be a one-off marker on its own, which made 「把 `%TEMP%` 下的临时
+  // 探针删掉」 unrememberable. It is a marker only when it modifies the action.
+  eq('临时 in front of a noun is not a one-off', looksOneOff('发布前把 `%TEMP%` 下的临时探针删掉。'), false);
+  eq('临时 in front of a verb still is', looksOneOff('这一次临时改成 40 就好。'), true);
+
+  // End to end: the point of all of the above is that the sentence reaches the
+  // WINDOW. A classifier that returns a kind but whose caller drops the record
+  // would pass every check above and still learn nothing.
+  const plainCapture = new Capture(makeWorld(makeHome('plain-words')).config);
+  const seen = plainCapture.recordUserMessage('plain', '别再拿 robocopy 做镜像了，上次它把 `docs/shots` 目录清空了。');
+  check('a plain correction reaches the observation window', Boolean(seen));
+  eq('and it is filed as a user correction', seen.source, 'user');
+  eq('and the window can see it', plainCapture.window('plain').items.length, 1);
+  eq('and a pure task instruction still does not', plainCapture.recordUserMessage('plain', '把 `lib/text.js` 改成 40。'), null);
+}
+
 // ============================================================ 6. extract
 
 start('extract — the real event feed, including the callId join');
@@ -1122,6 +1226,201 @@ start('review — propose, promote, reinforce, consolidate, undo');
     'and the fault says it is ours, not that it must not be touched',
     String(stranded.detail).includes('hand-written') && String(stranded.detail).includes('本插件自己'),
     stranded.detail,
+  );
+
+  // ------------------------------------------------ the budget is a hard stop
+  // The knob was documented as `Soft ceiling on rules per umbrella; crossing it is reported`
+  // and reporting is not a ceiling: `environment-facts` reached 23 rules and `tool-recovery`
+  // 35 against a budget of 24, because the write went through and the model was merely told.
+  // Hermes's review: 「`ruleBudget: 24` 是软上限——超过只报告不拒绝，所以 35 条的那把伞是被允许
+  // 的」. It is now refused, and the refusal names the ONLY operation that still works.
+  const budget = makeWorld(makeHome('review-budget'), { review: { ruleBudget: 6 } });
+  budget.review.ensureUmbrella('tool-recovery');
+  const budgetRules = budget.review.limits.ruleBudget;
+  check('the budget is the one the config asked for', budgetRules === 6, String(budgetRules));
+  // Six genuinely different statements, because `remember` reinforces a paraphrase instead of
+  // adding a twin — twenty paraphrases of one rule fill nothing, which is what the first draft
+  // of this block accidentally proved.
+  const FILLERS = [
+    '镜像到运行目录用 `robocopy /MIR`，别手工复制粘贴，否则残留文件会留在旧目录里。',
+    '打包发布用 `npm pack --pack-destination`，目标目录要先建好，不然 npm 直接报错退出。',
+    '回滚之前先看 `git reflog`，再决定 reset 还是 revert，别一上来就 reset --hard。',
+    '改完 `lib/text.js` 先跑 `node --check lib/text.js`，语法错误比逻辑错误更早暴露。',
+    '截图由 `docs/make-shots.py` 生成，不要手改 png，下一次重新生成会覆盖掉。',
+    '发布前把 `%TEMP%` 下的临时探针删掉，它们会被 robocopy 当成待同步内容。',
+  ];
+  for (const filler of FILLERS) {
+    const filled = budget.review.remember({
+      kind: 'TECHNIQUE',
+      statement: filler,
+      source: 'auto-assistant',
+      umbrella: 'tool-recovery',
+    });
+    if (!filled.ok) break;
+  }
+  const beforeFull = budget.skills.readRules('tool-recovery').length;
+  check('an umbrella can be filled to its budget', beforeFull >= budgetRules, `${beforeFull} 条 / 预算 ${budgetRules}`);
+  const overFull = budget.review.remember({
+    kind: 'TECHNIQUE',
+    statement: '再塞一条：跑 `node scripts\\selftest.mjs` 之后再跑 `node scripts\\client-check.mjs`。',
+    source: 'auto-assistant',
+    umbrella: 'tool-recovery',
+  });
+  check('but an automatic write past the budget is refused', overFull.ok === false && overFull.refused === true, JSON.stringify(overFull));
+  check('and the refusal names the budget, not a vague problem', overFull.code === 'budget' && overFull.budget === budgetRules, JSON.stringify(overFull));
+  check(
+    'and points at consolidate as the way out',
+    String(overFull.reason).includes('consolidate') && String(overFull.reason).includes(String(budgetRules)),
+    overFull.reason,
+  );
+  check(
+    'and the umbrella is not one rule longer than it was',
+    budget.skills.readRules('tool-recovery').length === beforeFull,
+    `${budget.skills.readRules('tool-recovery').length}`,
+  );
+  // The user's own words are the one thing that must never be turned away by a
+  // housekeeping limit: a budget is a reason to consolidate, not a reason to
+  // forget what the user asked for.
+  const userOver = budget.review.remember({
+    kind: 'REMEMBER_REQUEST',
+    statement: '用户要求：以后跑 `pnpm run build` 之前先 `pnpm run typecheck`。',
+    source: 'user-request',
+    umbrella: 'tool-recovery',
+  });
+  check('but a request straight from the user still gets in', userOver.ok === true, JSON.stringify(userOver));
+  check(
+    'and the ledger records the refusal, so the model can see why',
+    budget.store.readLedger({ limit: 50 }).some((row) => row.code === 'budget' && row.action === 'review.refuse'),
+  );
+
+  // -------------------------------------------- self-referential content lands
+  // The third home used to absorb everything: a rule about the review prompt, a
+  // rule about a regex, a rule about the gate — all "techniques", all in
+  // `tool-recovery`. That is how it reached 35 rules. `agent-engineering` is the
+  // fourth home, and `classifyRoute` checks it FIRST so the task umbrellas never
+  // get a chance to claim self-referential content.
+  check(
+    'a rule about the loop itself is recognised as self-referential',
+    review.SELF_REFERENCE_RE.test('拒绝清单要按「有没有具体对象」排，不能只按长度。') ||
+      review.SELF_REFERENCE_RE.test('提示词里那句「多数回合是有的」会诱导模型每轮都造规则。'),
+    String(review.SELF_REFERENCE_RE),
+  );
+  check(
+    'and routing sends it to the fourth home rather than a task umbrella',
+    review.classifyRoute('TECHNIQUE', '拒绝清单要按「有没有具体对象」排，不能只按长度。') === 'agent-engineering',
+  );
+  check(
+    'but an ordinary technique still routes where it did before',
+    review.classifyRoute('TECHNIQUE', '先跑 `node scripts\\selftest.mjs` 再提交。') !== 'agent-engineering',
+  );
+  check('the fourth home exists as an umbrella', Boolean(review.UMBRELLAS['agent-engineering']));
+}
+
+// ======================================================= 7b. the queue's exits
+{
+  // A queue with no ceiling is a queue whose reminder stops being read. Hermes's
+  // review found 713 proposals filed and 4 rules written: the nudge asked the
+  // model every turn not to leave it for later, and the pile only grew.
+  const queued = makeWorld(makeHome('review-queue'));
+  const filed = queued.review.propose({
+    kind: 'TECHNIQUE',
+    statement: '先跑 `node scripts\\selftest.mjs` 再提交，能挡住回归。',
+    source: 'auto-assistant',
+    fp: 'fp-old',
+  });
+  check('a proposal reaches the queue', Boolean(filed?.id) || Boolean(queued.store.loadPending().length), JSON.stringify(filed));
+
+  // Backdate the one entry past the expiry window and give it a single sighting:
+  // that is the exact shape the expiry is for — a session observation nobody came
+  // back for. A candidate seen repeatedly is still worth the reminder.
+  queued.store.updatePending((items) => {
+    for (const item of items) {
+      item.at = new Date(Date.now() - 30 * 86_400_000).toISOString();
+      item.hits = 1;
+      item.source = 'auto-tool';
+    }
+  });
+  const beforeSweep = queued.store.loadPending().length;
+  queued.review.propose({
+    kind: 'TECHNIQUE',
+    statement: '再跑一遍 `node scripts\\client-check.mjs` 确认浏览器半边。',
+    source: 'auto-assistant',
+    fp: 'fp-new',
+  });
+  const afterSweep = queued.store.loadPending();
+  check('an expired single-sighting candidate is swept', beforeSweep > 0 && !afterSweep.some((item) => item.fp === 'fp-old'), JSON.stringify(afterSweep.map((i) => i.fp)));
+  check(
+    'and the sweep is recorded, not silent',
+    queued.store.readLedger({ limit: 50 }).some((row) => row.action === 'review.drop' && String(row.reason).includes('过期')),
+  );
+
+  // The cap. `queueCap` oldest-first, and every drop is a ledger row.
+  const capped = makeWorld(makeHome('review-cap'));
+  const cap = capped.review.limits.queueCap;
+  for (let i = 0; i < cap * 2; i += 1) {
+    capped.review.propose({
+      kind: 'TECHNIQUE',
+      statement: `第 ${i} 条做法：先跑 \`node scripts\\selftest.mjs\` 再提交。`,
+      source: 'auto-assistant',
+      fp: `cap-${i}`,
+    });
+  }
+  const capItems = capped.store.loadPending();
+  check('the queue never grows past its cap', capItems.length <= cap, `${capItems.length} > ${cap}`);
+  check(
+    'and it kept the newest, not the oldest',
+    capItems.some((item) => item.statement.includes(`第 ${cap * 2 - 1} 条`)),
+    JSON.stringify(capItems.map((i) => i.statement.slice(0, 12))),
+  );
+  check(
+    'and the oldest is the one that went',
+    !capItems.some((item) => item.statement.includes('第 0 条')),
+    JSON.stringify(capItems.map((i) => i.statement.slice(0, 12))),
+  );
+  check(
+    'and every eviction is in the ledger',
+    capped.store.readLedger({ limit: 200 }).some((row) => row.action === 'review.drop' && String(row.reason).includes('队列超过')),
+  );
+
+  // ------------------------------------------- a no-op review is not a review
+  // 861 `review.propose` rows with `filedCount > 0` on only 15 of them: the
+  // automatic path re-read the same unchanged window over and over and restated
+  // the same refusal. The revision counter is what makes a no-op detectable.
+  const quiet = makeWorld(makeHome('review-revision'));
+  // Real observations, of the three kinds that actually reach the window. A task
+  // instruction would be refused by the gate before it ever became a candidate —
+  // which is the point of the gate, and would make this test measure nothing.
+  quiet.capture.recordUserMessage('sess-quiet', '记住：以后跑 `pnpm run build` 之前先跑 `pnpm run typecheck`。');
+  quiet.capture.recordUserMessage('sess-quiet', '别再拿 robocopy 做镜像了，上次它把 `docs/shots` 目录清空了。');
+  quiet.capture.recordUserMessage('sess-quiet', '本机 Python 在 `C:\\Users\\admin\\.dsh\\dsh-runtimes\\dsh-primary-runtime\\dependencies\\python\\python.exe`。');
+  const observed = quiet.capture.window('sess-quiet').items.length;
+  check('three real user observations reach the window', observed === 3, `${observed} 条`);
+  const first = quiet.review.runReview('sess-quiet', { dryRun: false, minWeight: 1 });
+  check('the first pass over a fresh window does work', first.unchanged !== true, JSON.stringify(first).slice(0, 200));
+  const second = quiet.review.runReview('sess-quiet', { dryRun: false, minWeight: 1 });
+  check('but a pass over an unchanged window is skipped', second.unchanged === true, JSON.stringify(second).slice(0, 200));
+  check('and the skip says so in words', String(second.note).includes('没有变化'), second.note);
+  quiet.capture.recordUserMessage('sess-quiet', '还有：`learn_skill_manage` 写入前会先过一遍内容卫生，别绕开它。');
+  const third = quiet.review.runReview('sess-quiet', { dryRun: false, minWeight: 1 });
+  check('while a new observation re-arms it', third.unchanged !== true, JSON.stringify(third).slice(0, 200));
+
+  // The session view answers the question the global counters cannot.
+  const view = quiet.review.sessionView('sess-quiet');
+  check('the session view says the session is watched', view?.watched === true, JSON.stringify(view));
+  check('and counts the observations it has', view?.observations >= 4, JSON.stringify(view));
+  check('and reports a revision it can be judged against', view?.revision > 0, JSON.stringify(view));
+  check('and knows a session it has never seen', quiet.review.sessionView('sess-never').watched === false);
+  check('and an empty id is simply not described', quiet.review.sessionView('') === null);
+  const doctorView = quiet.review.doctor({ sessionId: 'sess-quiet', customRoots: [] });
+  check(
+    'and doctor carries the session-scoped half of the wiring check',
+    doctorView.checks.some((entry) => entry.id === 'host-session' && entry.ok === true),
+    JSON.stringify(doctorView.checks.find((entry) => entry.id === 'host-session')),
+  );
+  const doctorBlind = quiet.review.doctor({ sessionId: 'sess-never', customRoots: [] });
+  check(
+    'and flags a session nothing is collecting from',
+    doctorBlind.checks.some((entry) => entry.id === 'host-session' && entry.ok === false),
   );
 }
 
@@ -2134,25 +2433,58 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
   // neutral outcome" — and keeps `_DO_NOT_CAPTURE_BLOCK` for after. So the
   // assertion is not "does it mention the refusals" (it did, and that was the
   // problem) but WHICH COMES FIRST.
+  // THE UNIT IS THE TASK, NOT THE TURN, and that is the v0.3.9 correction.
+  //
+  // v0.3.8 moved Hermes's stance into the discipline but silently changed its unit: Hermes's
+  // reviewer reads a whole conversation and means "most CONVERSATIONS produce one update",
+  // while this plugin's judge is a regex over a single sentence and 「多数回合是有的」 read as
+  // "write something every turn". Its second review caught the cost — `tool-recovery` at 35
+  // rules and `environment-facts` at 23, most of them statements rather than techniques.
+  // Task-level: be active. Turn-level: silence is the default.
   check(
-    'the discipline section asks the question at the turn end',
-    /一个回合结束时问自己一句/.test(DISCIPLINE_SECTION),
+    'the discipline section asks the question at the TASK end, not the turn end',
+    /一个任务结束时问自己一句/.test(DISCIPLINE_SECTION) && !/一个回合结束时问自己一句/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
   );
   check(
-    'and says that writing nothing is a waste, not a neutral outcome',
-    /不是中性结果/.test(DISCIPLINE_SECTION),
+    'and says the unit is the task, so a quiet turn is normal',
+    /单位是任务，不是回合/.test(DISCIPLINE_SECTION) && /多数回合什么都不必写/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
+  check(
+    'and still expects most TASKS to produce something',
+    /多数任务里至少有一件/.test(DISCIPLINE_SECTION),
     DISCIPLINE_SECTION,
   );
   check(
     'and puts the refusals AFTER the expectation, not instead of it',
-    DISCIPLINE_SECTION.includes('不是中性结果') &&
+    DISCIPLINE_SECTION.includes('多数任务里至少有一件') &&
       DISCIPLINE_SECTION.includes('不值得写的') &&
-      DISCIPLINE_SECTION.indexOf('不是中性结果') < DISCIPLINE_SECTION.indexOf('不值得写的'),
+      DISCIPLINE_SECTION.indexOf('多数任务里至少有一件') < DISCIPLINE_SECTION.indexOf('不值得写的'),
     DISCIPLINE_SECTION,
   );
   check(
     "and keeps Hermes's do-not-capture line about failures that are the environment's",
     /怎么装 \/ 怎么配/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
+  // Hermes's "artifact test": the cheapest question that makes a rule provable, because any
+  // statement that passes it can name the action it would change.
+  check(
+    'and states the action test, which makes a rule provable',
+    /动作测试/.test(DISCIPLINE_SECTION) && /会不会换一条命令/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
+  // The fourth home. Without this line the third umbrella absorbs every rule about the loop.
+  check(
+    'and names the fourth home, so self-referential rules stop landing in the task umbrellas',
+    /agent-engineering/.test(DISCIPLINE_SECTION) && /自指内容/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
+  // The hard budget is only real if the model is told about it before it hits it.
+  check(
+    'and warns that an umbrella has a hard ceiling and names the way out',
+    /24 条规则/.test(DISCIPLINE_SECTION) && /consolidate/.test(DISCIPLINE_SECTION),
     DISCIPLINE_SECTION,
   );
 
@@ -2463,6 +2795,42 @@ start('repair — real signatures parse');
   }
   eq('store exposes the lesson funnel', typeof store.appendLesson, 'function');
   eq('store exposes the ledger funnel', typeof store.appendLedger, 'function');
+}
+
+// ============================================================ docs
+
+start('docs — the numbers in the README are counted, not typed');
+
+// 「数字抄进说明文字，下一次提交就是错的。」 `docs/make-shots.py` counts the
+// sections out of this file instead of typing them into the caption; the README
+// cannot do that, so this checks it instead. It caught a real drift: v0.3.9 added
+// a section and three live places in the README still said 21. Historical
+// sections are allowed to state what was true then, which is why the bare-count
+// pattern excludes 「第 N 节」 (a claim about `client-check.mjs`, not about this file)
+// and refuses to start matching inside a two-digit number (「第 12 节」 would
+// otherwise match at the `2`).
+{
+  const selfSource = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  const sectionCount = selfSource.split('\n').filter((line) => line.startsWith("start('")).length;
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+
+  // +2 is this block's own two assertions: `passed` has not counted them yet.
+  const here = `${sectionCount}/${passed + failures.length + 2}`;
+  const pairs = [...readme.matchAll(/(\d+) 节 (\d+) 条断言/g)].map((m) => `${m[1]}/${m[2]}`);
+  eq(
+    'the README states the real section count and check count',
+    pairs.length > 0 && pairs.every((pair) => pair === here),
+    true,
+    `README says ${pairs.join(', ')} — this run is ${here}`,
+  );
+
+  const bare = [...readme.matchAll(/(?<![\d])(?<!第 )(\d+) 节(?=[：断])/g)].map((m) => Number(m[1]));
+  eq(
+    'and the bare section counts in the live sections agree',
+    bare.length > 0 && bare.every((count) => count === sectionCount),
+    true,
+    `README says ${bare.join(', ')} — this file has ${sectionCount}`,
+  );
 }
 
 // ============================================================ report
