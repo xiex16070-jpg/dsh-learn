@@ -50,6 +50,7 @@ import {
   SIGNAL,
   SELF_NARRATION_RE,
   META_DISCUSSION_RE,
+  AGENT_DELIBERATION_RE,
   SHAPE_REFUSALS,
   TASK_DIRECTIVE_RE,
   WORK_REPORT_RE,
@@ -72,6 +73,8 @@ import {
   ACTIONABLE_MAX_CHARS,
   hasConcreteDetail,
   assistantObservationOk,
+  userDirectiveOk,
+  LONGEST_USER_DIRECTIVE,
 } from '../lib/text.js';
 import { DEFAULT_SKILL_DESCRIPTION, DEFAULT_SKILL_NAME, defaultSkillText } from '../lib/skillfile.js';
 
@@ -979,6 +982,69 @@ start('text — the user\'s own words, in their own idioms');
     eq(`a task instruction stays invisible: ${sentence.slice(0, 18)}`, kinds.length, 0);
   }
 
+  // `REMEMBER_RE` used to accept the bare verb 记住, so any message that MENTIONED
+  // it counted as a request to remember — and `lib/review.js` writes a
+  // REMEMBER_REQUEST straight through with NO gate. The bill was already on disk:
+  // four rules in `durable-preferences/SKILL.md` tagged 「用户要求记住」 that were
+  // nothing of the kind, one of them an unclosed `<!--` comment that orphaned a
+  // line no rule id could reach. Every sentence below is real, out of the 169
+  // user-source messages in the corpus; the recap copy is the user quoting this
+  // plugin back at itself while complaining about it, and the job prompts arrive
+  // as `user/message` with `source: { kind: 'user' }`, which is ALL the guard at
+  // `lib/index.js:218` can see.
+  //
+  // The property under test is the composition, because the composition is what
+  // writes the file: classified as a request AND shaped like one.
+  const writesItself = (sentence) =>
+    classifyText(sentence, { source: 'user' })[0] === 'REMEMBER_REQUEST' && userDirectiveOk(sentence);
+  const NOT_REQUESTS = [
+    ['功能已正常，显示绿色的记住一条做法*3，再检查一遍是不是假把戏，防止只做外表。', 'the recap copy quoted back'],
+    ['经过测试，你每轮的学习回复依然存在问题，如：记住一条环境事实 · 做法没能记下 · 记住一条做法。', 'the recap copy quoted back'],
+    ['请让描述更纤细一些，记下一条做法是整合了什么skills？记下环境事实是什么事实。', 'the recap copy quoted back'],
+    ['You are writing ONE new file and nothing else.\nNever edit any other file in the repo.', 'an injected job prompt'],
+    ['You are auditing an Electron music player project (AR1S) for a settings-persistence bug. READ ONLY — do not modify any file.', 'an injected job prompt'],
+  ];
+  for (const [sentence, why] of NOT_REQUESTS) {
+    eq(`a mention is not a request — ${why}`, writesItself(sentence), false);
+  }
+  // The other half, and the one that matters more: the gate must not be so tight
+  // that it swallows the three genuine requests the same bank caught. A false
+  // negative here costs one confirmation; a false positive costs a rule the model
+  // follows for months — but a gate that refuses everything costs the feature.
+  const REAL_REQUESTS = [
+    '只需一句话回复。另外记住：以后汇报先给结论再给细节，别写客套话。',
+    '【自学习插件端到端验证】请只做一件事：用一句话确认你收到了这条消息。另外记住：我要求所有回答先给结论，再给细节，不要写客套话。',
+    '请只回复一句话确认收到。另外记住我对回答格式的要求：先给结论，再给细节，不要客套话。',
+  ];
+  for (const sentence of REAL_REQUESTS) {
+    eq(`a real request still writes itself: …${sentence.slice(-14)}`, writesItself(sentence), true);
+  }
+  // The envelope is not the remembered thing. Judging the whole message with
+  // `TASK_DIRECTIVE_RE` cost exactly these three, because 「请只回复一句话…」 is a
+  // task for this run wrapped around a standing preference.
+  eq(
+    'the remembered clause is judged, not the envelope asking for it',
+    userDirectiveOk('请只回复一句话确认收到。另外记住我对回答格式的要求：先给结论，再给细节，不要客套话。'),
+    true,
+  );
+  eq(
+    'and a one-turn instruction inside the remembered clause is still refused',
+    userDirectiveOk('记住：把 `lib/client.js` 的 `DETAIL_MAX_CHARS` 改成 40。'),
+    false,
+  );
+  // A document is not a directive. Genuine ones measure 6–63 characters across
+  // the corpus; the injected job prompts measure 3 510–10 185.
+  eq(
+    'a document longer than a person types is not a directive',
+    userDirectiveOk(`记住：${'x'.repeat(LONGEST_USER_DIRECTIVE)}`),
+    false,
+  );
+  // `我要` also opens a REQUIREMENT, and 我要求 contains 我要. The deliberation
+  // grammar is scoped to agent-side sources by its own docstring, but it was
+  // reaching this path and refusing 「我要求所有回答先给结论」 as planning prose.
+  eq('stating a requirement is not deliberating', AGENT_DELIBERATION_RE.test('另外记住：我要求所有回答先给结论'), false);
+  eq('but planning prose still is', AGENT_DELIBERATION_RE.test('我要先看一下 `lib/text.js` 的 `classifyText`'), true);
+
   // A pasted environment error is evidence, never a lesson. Hermes files this
   // class under 「环境相关的偶发失败」 — write how to install or configure, never
   // that a thing is absent. The sentence still classifies; the GATE is what has
@@ -1400,6 +1466,17 @@ start('review — propose, promote, reinforce, consolidate, undo');
   const second = quiet.review.runReview('sess-quiet', { dryRun: false, minWeight: 1 });
   check('but a pass over an unchanged window is skipped', second.unchanged === true, JSON.stringify(second).slice(0, 200));
   check('and the skip says so in words', String(second.note).includes('没有变化'), second.note);
+  // A skipped pass must leave no trace at all. This is the other half of the same
+  // measurement: 861 `review.propose` rows with `filedCount > 0` on only 15 of
+  // them, and 825 of the rows were the same window re-judged. Skipping the
+  // judgement but still writing the row would keep the ledger exactly as unreadable
+  // as it was.
+  const proposeRows = () => quiet.store.readLedger({ limit: 500 }).filter((row) => row.action === 'review.propose').length;
+  const beforeSkip = proposeRows();
+  // Five ticks, because the thing being measured happened by the hundred: the
+  // scheduler fires every few seconds and each tick re-judged the same window.
+  for (let tick = 0; tick < 5; tick += 1) quiet.review.runReview('sess-quiet', { dryRun: false, minWeight: 1 });
+  check('and five ticks over an unchanged window write no ledger row at all', proposeRows() === beforeSkip, `${beforeSkip} → ${proposeRows()}`);
   quiet.capture.recordUserMessage('sess-quiet', '还有：`learn_skill_manage` 写入前会先过一遍内容卫生，别绕开它。');
   const third = quiet.review.runReview('sess-quiet', { dryRun: false, minWeight: 1 });
   check('while a new observation re-arms it', third.unchanged !== true, JSON.stringify(third).slice(0, 200));
@@ -1543,7 +1620,7 @@ start('curator — one idle basis, seed-first-tick, archive-only');
 start('tools — the model-facing boundary');
 {
   const home = makeHome('tools');
-  const { tools, skills, managed, store } = makeWorld(home);
+  const { tools, skills, managed, store, capture } = makeWorld(home);
 
   for (const key of ['learn', 'learnReview', 'learnCurator', 'skillManage', 'learnSkills']) {
     // The registry key is the camelCase VARIABLE name; the tool's own `name`
@@ -1563,6 +1640,21 @@ start('tools — the model-facing boundary');
 
   const status = await call(tools.learn, { action: 'status' });
   check('status reports the learned dir', String(JSON.stringify(status)).includes('learned'));
+
+  // The session-scoped line has to work when the model does NOT name a session,
+  // because it never does: it calls `learn action=status` from inside the session it
+  // is asking about. The fallback used to be the literal string `'note'`, so the tool
+  // looked up a session that does not exist, found nothing, and printed
+  // 「还没有任何观测进入学习回路…跑 learn action=doctor 看 host-hooks」 — a false alarm
+  // that reads exactly like the outage it claims to diagnose, and one a model would
+  // faithfully relay to the user. The same sentinel put `会话 note` into the
+  // provenance of every rule written through `learn action=note`.
+  const watchId = 'session-tools-watch';
+  capture.recordUserMessage(watchId, '别再拿 robocopy 做镜像了，上次它把 `docs/shots` 目录清空了。');
+  capture.recordUserMessage(watchId, '本机 Python 在 `C:\\Users\\admin\\.dsh\\dsh-runtimes\\dsh-primary-runtime\\dependencies\\python\\python.exe`。');
+  const statusWithoutSession = String(await call(tools.learn, { action: 'status' }));
+  check('status describes the session the plugin actually saw, without being told which', /本会话：\d+ 条观测/.test(statusWithoutSession), statusWithoutSession.slice(0, 260));
+  check('and never tells the model a watched session was never watched', !statusWithoutSession.includes('还没有任何观测进入学习回路'), statusWithoutSession.slice(0, 260));
 
   // create -> read -> refuse-a-gut -> archive
   const created = await call(tools.skillManage, {
@@ -1667,6 +1759,17 @@ start('tools — the model-facing boundary');
   check('and the report carries the invariants it must obey', /只碰本插件管理的技能/.test(String(curatorRun)), curatorRun);
   check('the invariants are rendered as lines, not as a mangled value', !/\[object |trim is not a function/.test(String(curatorRun)), curatorRun);
   check('ledger recorded the decisions', store.readLedger().length > 0);
+
+  // Last in this section on purpose: it adds a rule to an umbrella, and the
+  // assertions above find "the umbrella with exactly one rule".
+  const sessionNoteResult = await call(tools.learn, {
+    action: 'note',
+    kind: 'technique',
+    statement: '发布前先跑 `node scripts\\selftest.mjs`，红了不要提交。',
+  });
+  check('a note written without a session still lands', String(sessionNoteResult).includes('已写入'), String(sessionNoteResult).slice(0, 200));
+  const sessionNoteFile = skills.read('tool-recovery').body;
+  check('and its provenance names the real session, not the sentinel', sessionNoteFile.includes(watchId) && !sessionNoteFile.includes('会话 note'), sessionNoteFile.slice(-220));
 
   const found = await call(tools.learnSkills, { query: '构建脚本 符号 测试树' });
   check('retrieval returns a list', Array.isArray(found.skills || found.matches || found.results || []), Object.keys(found));
@@ -2830,6 +2933,23 @@ start('docs — the numbers in the README are counted, not typed');
     bare.length > 0 && bare.every((count) => count === sectionCount),
     true,
     `README says ${bare.join(', ')} — this file has ${sectionCount}`,
+  );
+
+  // 「软上限」 was the word that made the cap not a cap: `environment-facts` reached 23 rules
+  // and `tool-recovery` 35 while every message about the number said "soft". Hermes put it
+  // exactly: 「一条写着『上限』却什么都不拦的规则，比没有规则更糟」. A limit described as
+  // soft is the limit nobody consolidates against, so the word is banned from `lib/` and
+  // from the README's own config table — this is the same defect class as a README count,
+  // caught the same way.
+  const libDir = fileURLToPath(new URL('../lib', import.meta.url));
+  const softSites = readdirSync(libDir)
+    .filter((name) => name.endsWith('.js'))
+    .filter((name) => readFileSync(join(libDir, name), 'utf8').includes('软上限'));
+  eq(
+    'and nothing still calls the rule cap soft',
+    softSites.length === 0 && !readme.includes('规则软上限'),
+    true,
+    `still saying 软上限: ${softSites.join(', ') || '(none in lib)'}${readme.includes('规则软上限') ? ' + README' : ''}`,
   );
 }
 

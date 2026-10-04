@@ -13,7 +13,7 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 23 节 693 条断言，浏览器半边 454 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 23 节 711 条断言，浏览器半边 454 条，零依赖 |
 
 ---
 
@@ -274,7 +274,7 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 - `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
 - 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
 
-自检现在 **23 节 693 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+自检现在 **23 节 711 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
 
 ### v0.3.2：变异测试没抓住的那几个守卫
 
@@ -579,7 +579,34 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 `DURABLE_FACT_RE` 因此加了一条：反引号句柄 + 是 / 指的是 / 叫做 / 表示 / 代表。英文的孪生写法（`X is Y`）写过又**删掉了**——它在普通英文散文上乱命中（`positive is actually`），把 `DEBUG MONOLOGUE: no signal from user source` 那条断言打红。
 
-**自检：23 节 693 条断言**（浏览器半边 454 条），全绿。
+### v0.3.10：一个动词不算一条指令，一个哨兵不该冒充会话
+
+这版修的是三件**已经在你自己的技能库里留下痕迹**的事。
+
+**一、`记住` 是一个动词，不是一个请求。** `REMEMBER_RE` 的第一条分支过去是光秃秃的动词表 `(?:记住|记下|记一下|别忘了|以后都|…)`——只要一句话**提到**了这个动词，就算用户在要求记忆。于是三种东西顺着这条直通路径写进了盘：9 223 字的「重写 README」注入提示、10 185 字的「You are writing ONE new file」、3 545 字的 AR1S 审计提示，以及**你把本插件的回执文案引用回来**时说的「显示绿色的记住一条做法\*3」「记下一条做法是整合了什么skills？」。
+
+关键在 `lib/review.js` 那句 `const userAsked = candidate.source === 'user' && candidate.kind === SIGNAL.REMEMBER_REQUEST;`——**这是唯一一条不经确认就落盘的路径**，分类错一次就没有回头的机会。现在三处一起收：
+
+- `REMEMBER_RE` 要求**指令形状**：`(?:请|务必|一定|要|得|你|您)\s*记住`、`记住(?:这个|这条|这些|一下)?\s*[：:，,]`、`记住(?:我|你|咱|我们)`、`记(?:下|一下)(?:这个|这条|这些)?[：:，,]`。
+- 新增 `LONGEST_USER_DIRECTIVE = 400` 和 `userDirectiveOk(text)`：真实指令在语料里是 6–63 字，注入的那些是 3 510–10 185 字，长度本身就是一个可用信号。它复用反捕获那一套形状拒绝（元讨论、一次性要求、命令堆、状态报告、事故复述、数据倾倒），再加 `TASK_DIRECTIVE_RE`。
+- `userAsked` 变成三条件，`userDirectiveOk(candidate.statement)` 是第三条。**假阴性只花你一次确认，假阳性会静默写坏库**——这个不对称就是理由。
+
+`rememberedClause()` 是这里唯一的技巧：判「记住：把 X 改成 Y」时先**把标记连同后面的标点一起剥掉**，否则字符串以「记住」开头，`TASK_DIRECTIVE_RE` 里所有 `^` 锚定的分支永远打不着。第一版没剥，`node scripts\selftest.mjs` 当场红了一条。
+
+修完在 169 条真实用户消息上重跑：旧词表命中 12 条、**5 条自己写进库**；新词表命中 10 条、**直写只剩 4 条，而且四条全是真话**（「只需一句话回复。另外记住：以后汇报先给结论再给细节，别写客套话。」等），注入提示和粘贴的审计报告全部降级成**候选**，等你点。
+
+**二、队列有入口，账本也得有出口。** 活账本 1 425 行里有 **762 行 `filedCount: 0 && skippedCount: 0`** 的空转 `review.propose`（10-01 就 318 行）。窗口没变就不该再写一行：`lib/capture.js` 的窗口记录多了 `revision`（`#push` 自增，去重命中也算变化），`runReview` 在 `!dryRun` 且 `revision` 没动时提前返回 `{ unchanged: true, note: '窗口自上次审查后没有变化，不重复提出' }`——**在写账本之前**返回。自检里连点五次并断言账本行数不变，注释写着「五次，因为被量的这件事是按百次发生的」。
+
+**三、`'note'` 是一个哨兵，它冒充了一个会话。** 宿主的 `ToolExecutionInput` 是 `{ callId, rootCallId?, name, schema?, arguments, agent?, parent?, signal }`——**工具执行上没有会话 id**。于是所有面向模型的会话级动作都落到 `sessionIdFrom` 的默认值 `'note'` 上，两个后果都能量出来：
+
+- `learn action=status` 去查一个叫 `note` 的会话，什么也没查到，然后打印「本会话：还没有任何观测进入学习回路。若这个会话已经聊了几轮，说明本会话的对话没被采集到——跑 `learn action=doctor` 看 host-hooks」。**这是一个和它声称要诊断的故障长得一模一样的假警报**，而且模型会一字不差地转述给你。
+- 每一条 `learn action=note` 写下的规则，出身里都写着「会话 note」。
+
+`lib/tools.js` 里新增 `currentSessionId(args)`：显式给就信显式的，否则在 `capture.sessions` 里取 `updatedAt` 最大的那个，都没有就返回空串（调用方本来就都会因此闭嘴）。`status` / `doctor` / `note` / `restore-pending` 四处都换成它，`sessionIdFrom` 保留哨兵并补了一句注释说明它不可被当成会话 id。自检新增五条：不指定会话时 `status` 必须报出 `/本会话：\d+ 条观测/`、且**不得**出现那句假警报，不指定会话写的规则其出身必须是真会话名。
+
+**四、上限不叫「软上限」。** 四处文案（`lib/review.js` 两处、`lib/tools.js` 一处、README 配置表）把它写成「软上限」，而闸门 `if (overBudget && source !== 'user-request')` 是**直接拒绝**。一个自称软的限额就是没人会去合并的限额。四处全部改口，并加了一条断言：**任何 `lib/*.js` 都不许再出现「软上限」**。
+
+**自检：23 节 711 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -773,7 +800,7 @@ learn action=doctor      # root / skills / host-root / legacy / budget / sidecar
 | `review.minWeight` | `2` | 低于此权重的观测不进候选 |
 | `review.maxProposals` | `8` | 一次审查最多提几个候选 |
 | `review.triggerObservations` | `3` | 窗口里有多少条观测才值得跑审查 |
-| `review.ruleBudget` | `24` | 一把伞的规则软上限，到了会提示先 `consolidate` |
+| `review.ruleBudget` | `24` | 一把伞的规则上限。到了之后新的自动写入会被**拒绝**，只有 `consolidate` 能腾位置；用户明确说「记住」的那一条是唯一例外 |
 | `review.similarity` | `0.6` | 去重/强化的相似度阈值 |
 | `curator.staleAfterDays` | `14` | 超过多少天没被加载 → `stale` |
 | `curator.archiveAfterDays` | `30` | 超过多少天没被加载 → 归档（移动，不是删） |
@@ -803,7 +830,7 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-693/693 checks passed — all green
+711/711 checks passed — all green
 454/454 checks passed
 ```
 
