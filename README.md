@@ -13,7 +13,7 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 21 节 612 条断言，浏览器半边 443 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 21 节 622 条断言，浏览器半边 443 条，零依赖 |
 
 ---
 
@@ -274,7 +274,7 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 - `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
 - 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
 
-自检现在 **21 节 612 条断言**（浏览器半边 443 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+自检现在 **21 节 622 条断言**（浏览器半边 443 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
 
 ### v0.3.2：变异测试没抓住的那几个守卫
 
@@ -415,6 +415,77 @@ return { ...transformed, sections: completeSection === void 0 ? transformed.sect
 | `code` | 5 | **0** |
 
 `code` 是这一版里已经不存在的 preset id（`app.asar` 里搜不到任何 `preset-code`）——那 5 个会话是旧的，不是第五种模式。`minimal` / `liangshen` / `minimal-windows` 各自 **0 个会话**：没人用过，所以这一格是**潜在缺口，不是已经发生的事故**，和 `ptc` 那次不一样。
+
+---
+
+### v0.3.8：它不是「决定不学」，它是看不见可学的东西
+
+用户的原话：「我发现这几轮对话还是没有任何学习……诚然不是每轮都必须强制学习，请你认真参考 hermes 的机制，看看它是怎么取舍，判断学习还是不学习的。」
+
+**先把 Hermes 的取舍读出来。** 它的判断不在提示词里，在一个独立的审查 agent 里（`agent/background_review.py`）。`_SKILL_REVIEW_PROMPT` 开头就是答案：
+
+> Review the conversation above and update the skill library. **Be ACTIVE — most sessions produce at least one skill update, even if small. A pass that does nothing is a missed learning opportunity, not a neutral outcome.**
+
+结尾再补一句：
+
+> "Nothing to save." is a real option but should NOT be the default. … Otherwise, act.
+
+它「不学」的判据是**内容形状**，写在 `_DO_NOT_CAPTURE_BLOCK` 里，而且**排在期望之后**：环境相关的偶发失败、对工具的否定结论、一次性的任务叙述、还没解决的失败。它连替代动作都写好了：*「If a tool failed because of setup state, capture the FIX (install command, config step, env var to set) … never 'this tool does not work' as a standalone constraint.」*
+
+| | Hermes | 本插件（v0.3.7 之前） |
+| --- | --- | --- |
+| 谁来判 | 一个审查 agent，独立模型调用，最多 16 轮 | 一组正则，判**一句**话 |
+| 看得到什么 | **整段对话** | 一条 400 字的观测，孤立地看 |
+| 默认 | **行动** | **拒绝** |
+| 采什么 | 会话的**结果**（纠正、做法、修法） | 助手自己的**过程叙述** |
+| 不采什么 | 内容形状（偶发失败、否定结论…） | 内容形状 + 措辞，一长串 |
+
+**然后是本插件自己的账。** 把 `ledger.jsonl` 全量读一遍（1197 行）：
+
+| 指标 | 值 |
+| --- | --- |
+| `review.propose` 行 | 861（其中 `filedCount > 0` 的只有 **15** 行） |
+| 全生命周期提出的候选 | **18** 条 |
+| `review.refuse` 行 | 261 |
+| 其中来自**助手自己**的 | **158（60%）** |
+| 自动路径写出的规则 | **5 条** |
+| 模型自己 `learn action=note` 写出的规则 | **43 条** |
+
+自动路径不是在「判断这轮不该学」——它在拒绝自己刚说的话，然后把这件事记了 861 遍。
+
+**证据是活的。** 2026-10-04T05:58Z，审查器正在处理**我自己的思考**，三条全部拒绝：
+
+```
+"Now I have everything. Let me write the fix. **The rewrite of `DISCIPLINE_SECTION`**…"
+   → 是过程叙述或插件自身的讨论，不是可迁移的做法
+"Now let me implement the fix. Based on the diagnosis (b157), the plan: **Part 1…"
+   → 是过程叙述…；读不出可迁移的做法或具体对象
+"**THE MEASUREMENT IS DAMNING AND CLEAR:** - `review.propose` rows: 861…"
+   → 具体对象有，但太长了：239 字
+```
+
+**两处改动。**
+
+一、**纪律的语气改成 Hermes 的**（`lib/host.js` 的 `DISCIPLINE_SECTION`）。原文开头是许可（「把『下一次还会用到』的东西写下来」），五个自然段里两段在讲**不该写什么**，结尾「拒了就是拒了」——读起来是禁令。现在开头是问题：「这一轮里有没有『下一次还会用到』的东西？多数回合是有的……什么都不写是一次学习机会的浪费，不是中性结果。」拒绝清单还在（Hermes 也有一份），但**排在期望之后**，并且补上了它那条「环境失败要记成怎么装 / 怎么配，不要记成『这个工具不行』」。
+
+`host` 一节因此不再问「它提没提拒绝」，而是问**哪个在前**：
+
+```js
+DISCIPLINE_SECTION.indexOf('不是中性结果') < DISCIPLINE_SECTION.indexOf('不值得写的')
+```
+
+二、**助手自己的话在进窗口之前就被拦下**（`lib/text.js` 的 `assistantObservationOk`，由 `lib/capture.js` 的 `recordAssistantMessage` 调用）。原来那两个条件——`classifyText({ source: 'assistant' })` 命中一个显式词库、`hasConcreteDetail` 找得到句柄——**叙述全满足**，因为叙述里全是反引号路径。现在它要过的是 `gateObservation` 对 agent 侧文本用的**同一组形状检查**，只是挪到了入口：门槛本身一个字没改，那些文本本来也会在后面被拒，只是每一次都要先花掉一行账本和一轮候选扫描。
+
+**这一步是量过的**，用 `scripts/replay-session.mjs` 把真实会话（`session-5fc51e8e`）完整跑一遍，开 / 关两个状态：
+
+| | 观测数 | 提出的候选 |
+| --- | --- | --- |
+| 关掉过滤器 | 120 | 8（其中 3 条是助手的叙述） |
+| 打开过滤器 | 104 | 8（叙述没了，真正的要求一条不少） |
+
+**16 条观测被丢掉，全是叙述；一个真实的候选都没少。**
+
+`safety` 一节补了那三条真实拒绝行的原文，加上「助手真的写下一条规则时仍然放行」的正向断言——否则这个修法就成了「别听写规则的那一半对话」。
 
 ---
 
@@ -638,7 +709,7 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-612/612 checks passed — all green
+622/622 checks passed — all green
 443/443 checks passed
 ```
 

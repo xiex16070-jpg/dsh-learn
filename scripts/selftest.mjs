@@ -71,6 +71,7 @@ import {
   tokenize,
   ACTIONABLE_MAX_CHARS,
   hasConcreteDetail,
+  assistantObservationOk,
 } from '../lib/text.js';
 import { DEFAULT_SKILL_DESCRIPTION, DEFAULT_SKILL_NAME, defaultSkillText } from '../lib/skillfile.js';
 
@@ -2121,6 +2122,40 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
     DISCIPLINE_SECTION,
   );
 
+  // The STANCE, and its ORDER. The text this replaced opened with a permission
+  // (「把『下一次还会用到』的东西写下来」) and spent two of its five paragraphs on
+  // what is NOT worth writing, ending 「拒了就是拒了」. A measured read of the
+  // ledger on 2026-10-04 says what that produces: 861 review passes, 18 proposals
+  // ever filed, and 5 rules from the automatic path against 43 from the model's
+  // own `learn action=note`. Hermes's reviewer prompt
+  // (`agent/background_review.py`, `_SKILL_REVIEW_PROMPT`) says it the other way
+  // round — "Be ACTIVE — most sessions produce at least one skill update, even if
+  // small. A pass that does nothing is a missed learning opportunity, not a
+  // neutral outcome" — and keeps `_DO_NOT_CAPTURE_BLOCK` for after. So the
+  // assertion is not "does it mention the refusals" (it did, and that was the
+  // problem) but WHICH COMES FIRST.
+  check(
+    'the discipline section asks the question at the turn end',
+    /一个回合结束时问自己一句/.test(DISCIPLINE_SECTION),
+  );
+  check(
+    'and says that writing nothing is a waste, not a neutral outcome',
+    /不是中性结果/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
+  check(
+    'and puts the refusals AFTER the expectation, not instead of it',
+    DISCIPLINE_SECTION.includes('不是中性结果') &&
+      DISCIPLINE_SECTION.includes('不值得写的') &&
+      DISCIPLINE_SECTION.indexOf('不是中性结果') < DISCIPLINE_SECTION.indexOf('不值得写的'),
+    DISCIPLINE_SECTION,
+  );
+  check(
+    "and keeps Hermes's do-not-capture line about failures that are the environment's",
+    /怎么装 \/ 怎么配/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
+
   // ------------------------------------------- the surface presets cannot drop
   // A preset whose persona sets `complete: true` — the shipped `minimal`, and
   // this machine's `minimal-windows` — makes that persona the SOLE assembled
@@ -2264,6 +2299,45 @@ start('safety — the guards the mutation testing walked straight through');
   check('and it is still where it was', cw.skills.exists('pinned-skill'));
   check('a skill with three recorded loads is spared', !swept.includes('well-used'), sweep.moved);
   check('and it is still on disk', cw.skills.exists('well-used'));
+
+  // ---- the agent's own prose, stopped where it ENTERS the window -----------
+  // `recordAssistantMessage` accepted any assistant text where
+  // `classifyText({source:'assistant'})` fired an explicit bank and
+  // `hasConcreteDetail` found a handle. Narration satisfies both — narration is
+  // full of backticked paths. The ledger says what that cost: of 261
+  // `review.refuse` rows over the plugin's whole life, **158 (60%) were the
+  // plugin rejecting the assistant's own prose**, while the entire automatic
+  // path filed 18 proposals and produced 5 rules against 43 from the model's own
+  // `learn action=note`.
+  //
+  // These four strings are the rows `ledger.jsonl` really refused at
+  // `2026-10-04T05:58Z` (truncated where the ledger itself truncates).
+  const whisper = [
+    "Now let me implement the fix. Based on the diagnosis (b157), the plan: **Part 1 — the automatic path stops mining the assistant's narrat",
+    "Now I have everything. Let me write the fix. **The rewrite of `DISCIPLINE_SECTION`** — Hermes's decision rule, adapted: New text: ``` [l",
+    '**THE MEASUREMENT IS DAMNING AND CLEAR:** - `review.propose` rows: 861. Of those, only **15** filed anything (`filedCount > 0`), 482 fil',
+    'Let me read the file now to check the import list.',
+  ];
+  for (const text of whisper) {
+    const kinds = classifyText(text, { source: 'assistant' });
+    const entered = kinds.length > 0 && assistantObservationOk(text, kinds[0]);
+    check(
+      `the agent's own narration never enters the window — ${text.slice(0, 24)}…`,
+      entered === false,
+      text,
+    );
+  }
+  // …and the filter must not silence the agent. A rule the assistant really
+  // STATED still has to get through, or the fix would be "stop listening to the
+  // half of the conversation that writes the rules".
+  const spoken = '修好了：先跑 `node --check lib/text.js` 再提交，能挡住语法错误。';
+  const spokenKinds = classifyText(spoken, { source: 'assistant' });
+  eq('a rule the agent really stated still carries a kind', spokenKinds[0], SIGNAL.TECHNIQUE);
+  check(
+    'and still passes the entry filter',
+    assistantObservationOk(spoken, spokenKinds[0]) === true,
+    spoken,
+  );
 
   // ---- F4 / F5: the gate's two honesty failures, pinned -------------------
   // F5: a work report used to be REFUSED while all six checks reported green, so
