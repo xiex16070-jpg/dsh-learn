@@ -2917,8 +2917,8 @@ start('docs — the numbers in the README are counted, not typed');
   const sectionCount = selfSource.split('\n').filter((line) => line.startsWith("start('")).length;
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 
-  // +2 is this block's own two assertions: `passed` has not counted them yet.
-  const here = `${sectionCount}/${passed + failures.length + 2}`;
+  // +3 is this block's own three assertions: `passed` has not counted them yet.
+  const here = `${sectionCount}/${passed + failures.length + 3}`;
   const pairs = [...readme.matchAll(/(\d+) 节 (\d+) 条断言/g)].map((m) => `${m[1]}/${m[2]}`);
   eq(
     'the README states the real section count and check count',
