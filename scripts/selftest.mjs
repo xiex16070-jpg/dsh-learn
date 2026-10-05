@@ -31,11 +31,11 @@ import { CONFIG_SHAPE, normalizeConfig } from '../lib/config.js';
 import { createCurator } from '../lib/curator.js';
 import { makeExtractor } from '../lib/extract.js';
 import { createGraph } from '../lib/graph.js';
-import { DISCIPLINE_SECTION, createHostHooks, guardSkillWrites, isInside, normalizePath, queueNudge } from '../lib/host.js';
+import { DISCIPLINE_SECTION, RULE_EXCERPT_MAX_CHARS, createHostHooks, guardSkillWrites, isInside, normalizePath, queueNudge, ruleExcerpt } from '../lib/host.js';
 import { migrateOwnSkills, optionalSkillsService, pickSurvivor, probeLearnedRoot } from '../lib/index.js';
 import { createManaged } from '../lib/managed.js';
 import { LEARNED_PROVIDER, LEARNED_RANK, createLearnedProvider, registerLearnedProvider } from '../lib/provider.js';
-import { createReview } from '../lib/review.js';
+import { createReview, RULE_BUDGET, RULE_BUDGET_CHARS, UMBRELLAS } from '../lib/review.js';
 import {
   escapeBraces,
   findInjection,
@@ -44,7 +44,7 @@ import {
   screenStatement,
 } from '../lib/sanitize.js';
 import { createSkills, fitDescription, parseFrontmatter, slugify } from '../lib/skills.js';
-import { createStore, LEDGER_KEEP_ROTATED, LEDGER_ROTATE_BYTES } from '../lib/storage.js';
+import { createStore, LEDGER_KEEP_ROTATED, LEDGER_ROTATE_BYTES, LESSONS_KEEP_ROTATED, LESSONS_ROTATE_BYTES, STATE_KEYS } from '../lib/storage.js';
 import { createTools } from '../lib/tools.js';
 import {
   SIGNAL,
@@ -77,7 +77,6 @@ import {
   LONGEST_USER_DIRECTIVE,
 } from '../lib/text.js';
 import { DEFAULT_SKILL_DESCRIPTION, DEFAULT_SKILL_NAME, defaultSkillText } from '../lib/skillfile.js';
-
 const here = dirname(fileURLToPath(import.meta.url));
 const SANDBOX = join(here, '..', '.selftest-home');
 
@@ -264,11 +263,25 @@ start('store — lock, state, and the lesson funnel');
   const { store } = makeWorld(home);
   check('store dirs exist', existsSync(store.dirs.root) && existsSync(store.dirs.archive));
 
-  const a = store.updateState((state) => ({ ...state, n: (state.n || 0) + 1 }));
-  eq('updateState returns the new state', a.n, 1);
-  const b = store.updateState((state) => ({ ...state, n: (state.n || 0) + 1 }));
-  eq('updateState accumulates under lock', b.n, 2);
-  eq('reload sees the persisted value', store.loadState().n, 2);
+  // `state.json` is a counter file with a schema (`STATE_KEYS`), so the accumulation test
+  // runs against a key that is actually declared. The old version used `n`, which nothing
+  // reads — which is the defect the whitelist exists to catch, reproduced in the test that
+  // was supposed to be watching for it.
+  const a = store.updateState((state) => ({ ...state, reviews: (state.reviews || 0) + 1 }));
+  eq('updateState returns the new state', a.reviews, 1);
+  const b = store.updateState((state) => ({ ...state, reviews: (state.reviews || 0) + 1 }));
+  eq('updateState accumulates under lock', b.reviews, 2);
+  eq('reload sees the persisted value', store.loadState().reviews, 2);
+
+  // And the other half: a key nobody declared is dropped, on read AND on write, so the
+  // four dead fields Hermes found in the live file cannot come back through a mutator
+  // that spreads what it loaded.
+  store.updateState((state) => ({ ...state, review_count: 99, learned_root_live: true }));
+  const pruned = store.loadState();
+  eq('an undeclared key is pruned on write', 'review_count' in pruned, false);
+  eq('and so is the second one', 'learned_root_live' in pruned, false);
+  eq('while the declared keys survive', pruned.reviews, 2);
+  eq('STATE_KEYS is the whole schema', STATE_KEYS.includes('last_review_at') && STATE_KEYS.includes('curator_pinned'), true);
 
   const clean = store.appendLesson({
     statement: '把 pnpm 的 store 指到 D 盘可以避免 C 盘爆满',
@@ -1299,11 +1312,23 @@ start('review — propose, promote, reinforce, consolidate, undo');
   // and reporting is not a ceiling: `environment-facts` reached 23 rules and `tool-recovery`
   // 35 against a budget of 24, because the write went through and the model was merely told.
   // Hermes's review: 「`ruleBudget: 24` 是软上限——超过只报告不拒绝，所以 35 条的那把伞是被允许
-  // 的」. It is now refused, and the refusal names the ONLY operation that still works.
-  const budget = makeWorld(makeHome('review-budget'), { review: { ruleBudget: 6 } });
+  // 的」.
+  //
+  // The FIRST hard version counted rules and was a wall with no door: on the real library
+  // `tool-recovery` (37) and `environment-facts` (27) both refused every write, the refusal
+  // said "consolidate first", and `consolidate --dry-run` found ZERO near-duplicates in all
+  // four umbrellas — write → refused → told to merge → nothing to merge → write. It also
+  // refused `source: 'promoted'`, so `learn action=restore-pending` — the command
+  // `learn action=pending` prints itself — could never succeed.
+  //
+  // So the ceiling is CHARACTERS, the count is advisory, and the refusal runs the read-only
+  // probe itself so it can name an exit that actually exists. This block pins all of it.
+  const budget = makeWorld(makeHome('review-budget'), { review: { ruleBudget: 6, ruleBudgetChars: 2000 } });
   budget.review.ensureUmbrella('tool-recovery');
   const budgetRules = budget.review.limits.ruleBudget;
+  const budgetChars = budget.review.limits.ruleBudgetChars;
   check('the budget is the one the config asked for', budgetRules === 6, String(budgetRules));
+  eq('and the ceiling is a character count', budgetChars, 2000);
   // Six genuinely different statements, because `remember` reinforces a paraphrase instead of
   // adding a twin — twenty paraphrases of one rule fill nothing, which is what the first draft
   // of this block accidentally proved.
@@ -1324,19 +1349,55 @@ start('review — propose, promote, reinforce, consolidate, undo');
     });
     if (!filled.ok) break;
   }
+  const atLine = budget.skills.readRules('tool-recovery').length;
+  check('an umbrella can be filled to its advisory line', atLine >= budgetRules, `${atLine} 条 / 提示线 ${budgetRules}`);
+  // The count is a hint, not a gate: six rules into a six-rule budget, and the next write
+  // still lands, because the BODY is 663 characters and the ceiling is 2000. This is the
+  // half that makes the limit usable — a count-shaped wall would have refused here.
+  const pastLine = budget.review.remember({
+    kind: 'TECHNIQUE',
+    statement: '过提示线之后还写得进去：`ruleBudget` 只报告，`ruleBudgetChars` 才拒绝。',
+    source: 'auto-assistant',
+    umbrella: 'tool-recovery',
+  });
+  eq('the advisory line does not refuse a write', pastLine.ok, true);
+  // Now fill the BODY to the ceiling, which is the actual limit.
+  //
+  // The body is PLANTED rather than grown rule by rule, and that is deliberate: `remember`
+  // caps a rule at 200 characters (`ACTIONABLE_MAX_CHARS`) and `condense` at 400, so reaching
+  // 2000 characters through the real gate would take a dozen more hand-tuned sentences — and
+  // the property under test is the gate, which reads the file's actual length and does not
+  // care how the length got there. The planting uses the same `skills.write` the plugin uses.
+  const bulk = Array.from(
+    { length: 16 },
+    (_, i) => `- 规则 ${i + 1}：${'先把命令写对，再谈顺序，最后才谈风格。'.repeat(6)} <!-- r:planted${String(i + 1).padStart(2, '0')} -->`,
+  ).join('\n');
+  const planted = budget.skills.write('tool-recovery', {
+    description: '从工具失败里恢复的做法',
+    // The `## 规则` heading is `RULE_MARKER`: `skills.write` refuses a rewrite of a protected
+    // skill that would drop the section, which is the anti-gutting guard — it caught this
+    // fixture on the first run, which is a good sign for the guard.
+    body: `# 工具恢复\n\n## 规则\n\n${bulk}\n`,
+  });
+  check('the fixture body was planted', planted.ok !== false, JSON.stringify(planted));
   const beforeFull = budget.skills.readRules('tool-recovery').length;
-  check('an umbrella can be filled to its budget', beforeFull >= budgetRules, `${beforeFull} 条 / 预算 ${budgetRules}`);
+  const bodyNow = String((budget.skills.read('tool-recovery') || {}).body || '').length;
+  check('the body can be filled to the character ceiling', bodyNow >= budgetChars, `${bodyNow} 字符 / 上限 ${budgetChars}`);
   const overFull = budget.review.remember({
     kind: 'TECHNIQUE',
     statement: '再塞一条：跑 `node scripts\\selftest.mjs` 之后再跑 `node scripts\\client-check.mjs`。',
     source: 'auto-assistant',
     umbrella: 'tool-recovery',
   });
-  check('but an automatic write past the budget is refused', overFull.ok === false && overFull.refused === true, JSON.stringify(overFull));
-  check('and the refusal names the budget, not a vague problem', overFull.code === 'budget' && overFull.budget === budgetRules, JSON.stringify(overFull));
+  check('but an automatic write past the ceiling is refused', overFull.ok === false && overFull.refused === true, JSON.stringify(overFull));
+  check('and the refusal names the ceiling, not a vague problem', overFull.code === 'budget' && overFull.bodyChars >= budgetChars, JSON.stringify(overFull));
   check(
-    'and points at consolidate as the way out',
-    String(overFull.reason).includes('consolidate') && String(overFull.reason).includes(String(budgetRules)),
+    'and it names an exit that actually exists',
+    // Not "run consolidate" as a slogan: `budgetExits` runs the read-only probe and reports
+    // what it found. Either there ARE near-duplicates and the reason gives the exact command,
+    // or there are none and the reason says so and offers undo / a separate skill instead.
+    String(overFull.reason).includes('consolidate') &&
+      (String(overFull.reason).includes('dryRun=false') || String(overFull.reason).includes('堵死')),
     overFull.reason,
   );
   check(
@@ -1344,6 +1405,15 @@ start('review — propose, promote, reinforce, consolidate, undo');
     budget.skills.readRules('tool-recovery').length === beforeFull,
     `${budget.skills.readRules('tool-recovery').length}`,
   );
+  // The queue's own exit must survive a full umbrella. `promoted` is a candidate a human or
+  // model explicitly picked out of the queue; refusing it sealed the only door the queue had.
+  const promotedOver = budget.review.remember({
+    kind: 'TECHNIQUE',
+    statement: '恢复候选：先确认 `pending.json` 里那一条的 `fp` 还在，再去掉已经写过的那部分。',
+    source: 'promoted',
+    umbrella: 'tool-recovery',
+  });
+  check('a promoted candidate still gets in past the ceiling', promotedOver.ok === true, JSON.stringify(promotedOver));
   // The user's own words are the one thing that must never be turned away by a
   // housekeeping limit: a budget is a reason to consolidate, not a reason to
   // forget what the user asked for.
@@ -1727,6 +1797,47 @@ start('tools — the model-facing boundary');
   const doctor = await call(tools.learn, { action: 'doctor' });
   check('doctor is reachable through the tool', typeof doctor === 'string' && doctor.length > 0, doctor);
   check('doctor names the skill root', doctor.includes(skills.learnedDir), doctor);
+
+  // doctor must be able to WARN.
+  //
+  // Hermes's item 3: the counted budget made `doctor` permanently red on the real library
+  // (`tool-recovery` 37, `environment-facts` 27) with no operation that could fix it — the
+  // same defect v0.2.3 #27 fixed for a different check. A self-test that is always red is a
+  // self-test nobody reads. The count is now a warning and only the character ceiling is an
+  // error, so both levels need a case: this is the warning one, on a world whose advisory
+  // line is the lowest the knob allows (5).
+  const warnWorld = makeWorld(makeHome('doctor-warn'), { review: { ruleBudget: 5 } });
+  warnWorld.review.ensureUmbrella('tool-recovery');
+  for (const line of [
+    '镜像用 `robocopy /MIR`，别手工复制。',
+    '打包用 `npm pack --pack-destination`，目标目录先建好。',
+    '回滚前先看 `git reflog`，别直接 reset --hard。',
+    '改完先跑 `node --check lib/text.js`，语法错更早暴露。',
+    '截图由 `docs/make-shots.py` 生成，不要手改 png。',
+    '发布前删掉 `%TEMP%` 下的临时探针。',
+  ]) {
+    warnWorld.review.remember({ kind: 'TECHNIQUE', statement: line, source: 'auto-assistant', umbrella: 'tool-recovery' });
+  }
+  const warnReport = warnWorld.review.doctor();
+  // Asserted on the CHECK, not on `doctor().ok`: a fresh world legitimately fails `host-root`
+  // (the dedicated root is only live after the host has been asked), and that unrelated
+  // failure must not be what this case is measuring.
+  const budgetCheck = warnReport.checks.find((check) => check.id === 'budget:tool-recovery');
+  check(
+    'a count past the advisory line is a warning, not a failure',
+    Boolean(budgetCheck) && budgetCheck.ok === false && budgetCheck.level === 'warn',
+    JSON.stringify(budgetCheck),
+  );
+  check(
+    'and it lands in warnings rather than issues',
+    warnReport.warnings.some((line) => /提示线/.test(line)) && !warnReport.issues.some((line) => /提示线/.test(line)),
+    JSON.stringify({ warnings: warnReport.warnings, issues: warnReport.issues }),
+  );
+  check(
+    'and the warning says the writes still go through',
+    warnReport.warnings.some((line) => /仍然写得进去/.test(line)),
+    JSON.stringify(warnReport.warnings),
+  );
 
   const consolidate = await call(tools.learn, { action: 'consolidate', dryRun: true });
   check('consolidate dry-run is reachable', typeof consolidate === 'string' && consolidate.length > 0, consolidate);
@@ -2245,6 +2356,28 @@ start('ledger — real hit counts, a bounded tail, and rotation that keeps its r
   store.appendLedger({ action: 'probe2' });
   eq('old rotations are pruned down to the newest few', rotations().length, LEDGER_KEEP_ROTATED);
 
+  // ---- and the OTHER append-only file rotates too.
+  //
+  // Hermes's P2(c): `lessons.jsonl` had no rotation at all while the ledger rotated at 2MB
+  // — 48KB and only growing, on the same disk, written by the same process. The rotation was
+  // written once, for one file, and the second file simply did not get it. "Whoever appends,
+  // rotates first" is now the rule in `appendLesson`.
+  const lessonRotations = () => readdirSync(store.dirs.root).filter((name) => /^lessons-\d{8}-[a-z0-9]+\.jsonl$/.test(name));
+  writeFileSync(store.files.lessons, filler(1200), 'utf8');
+  check('the lessons filler is over its own, lower threshold', statSync(store.files.lessons).size >= LESSONS_ROTATE_BYTES);
+  store.appendLesson({ statement: '跑 `node --check` 之后再提交', kind: SIGNAL.TECHNIQUE, reason: '有效做法' });
+  eq('lessons.jsonl rotates once it is over the threshold', lessonRotations().length, 1);
+  check(
+    'and the rotated lessons file kept the old rows',
+    readFileSync(join(store.dirs.root, lessonRotations()[0]), 'utf8').includes('"filler"'),
+    lessonRotations().join(', '),
+  );
+  eq('and the fresh lessons file holds only what came after', store.readLessons().length, 1);
+  for (let i = 0; i < 4; i += 1) writeFileSync(join(store.dirs.root, `lessons-2026010${i}-pad${i}.jsonl`), '{}\n', 'utf8');
+  writeFileSync(store.files.lessons, filler(1200), 'utf8');
+  store.appendLesson({ statement: '再写一条 `lib/text.js` 的规则', kind: SIGNAL.TECHNIQUE, reason: '有效做法' });
+  eq('old lessons rotations are pruned too', lessonRotations().length, LESSONS_KEEP_ROTATED);
+
   // ---- the tail is what a bounded read is for. A rotation leaves ONE row behind,
   // so the tail is measured after adding rows that are actually there.
   store.appendLedger({ action: 'tail-a' });
@@ -2499,9 +2632,10 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
   sameList('both prompt sections and the guard register', wired.applied, [
     'systemPrompt.section',
     'systemPrompt.section(queue)',
+    'systemPrompt.section(rules)',
     'tools.guard',
   ]);
-  sameList('exactly two sections reach the host', specs.map((spec) => spec.name), ['learn-discipline', 'learn-queue']);
+  sameList('exactly three sections reach the host', specs.map((spec) => spec.name), ['learn-discipline', 'learn-queue', 'learn-rules']);
   eq('the discipline section is byte-stable text', typeof specs[0].text, 'string');
   eq('and declares no interpolation', specs[0].interpolate, false);
   eq('the discipline section is registered once, not per turn', specs[0].text, DISCIPLINE_SECTION);
@@ -2512,6 +2646,41 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
   eq('just above the queue nudge', specs[1].order, 91);
   eq('the queue section is a function so it can be empty', typeof specs[1].text, 'function');
   eq('with nothing queued it contributes nothing', specs[1].text(), '');
+
+  // ------------------------------- the excerpt that makes it a loop
+  //
+  // Hermes's P1-1, measured over 20 sessions and ~30k events: 138 `learn*` calls,
+  // 2 `skill` loads, 0 `learn_skills` calls, and no `usage.json` ever created —
+  // rules were written into a place nothing read. A library that is never
+  // retrieved from is a diary, so the rules ride along in the prompt now, bounded
+  // and deterministic (the same files must render the same bytes, or every turn
+  // would invalidate the prompt cache the discipline section depends on).
+  eq('the rules section sits after the queue', specs[2].order, 92);
+  eq('and is a function, because it must be able to say nothing', typeof specs[2].text, 'function');
+  const noRulesYet = ruleExcerpt({ list: () => [], readRules: () => [] });
+  eq('an empty library contributes nothing at all', noRulesYet, '');
+  eq('and a host without a skills service does not crash it', ruleExcerpt(null), '');
+  // A fixture rule, so the excerpt has something to render. Written with the same
+  // `skills.write` the plugin uses, marker and all.
+  skills.write('tool-recovery', {
+    description: '从工具失败里恢复的做法',
+    body: '# 工具恢复\n\n## 规则\n\n- 改完先跑 `node --check lib/text.js`，语法错误比逻辑错误更早暴露。 <!-- r:excerpt1 -->\n',
+  });
+  const excerpt = ruleExcerpt(skills);
+  check('the excerpt names the skills that have rules', excerpt.includes('tool-recovery'), excerpt);
+  check('and shows the rule text, not just the skill name', /·\s+\S/.test(excerpt), excerpt);
+  check('and points at the two ways to read the rest', /learn action=list/.test(excerpt) && /learn_skills/.test(excerpt), excerpt);
+  check('and never grows past its budget', excerpt.length <= RULE_EXCERPT_MAX_CHARS + 300, String(excerpt.length));
+  check(
+    'and is deterministic, because the prefix cache depends on it',
+    ruleExcerpt(skills) === excerpt,
+    'two renders of the same files differed',
+  );
+  check(
+    'and the resident skill is not repeated into every prompt',
+    !excerpt.includes(DEFAULT_SKILL_NAME),
+    excerpt.slice(0, 200),
+  );
   check('the discipline section states the refusals', /不值得写的/.test(DISCIPLINE_SECTION));
   check('and the backtick rule that the gate actually enforces', /反引号/.test(DISCIPLINE_SECTION));
   // The prompt must state the LENGTH limit too, and state the real number: a
@@ -2584,10 +2753,18 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
     /agent-engineering/.test(DISCIPLINE_SECTION) && /自指内容/.test(DISCIPLINE_SECTION),
     DISCIPLINE_SECTION,
   );
-  // The hard budget is only real if the model is told about it before it hits it.
+  // The budget is only real if the model is told about it before it hits it — and told the
+  // TRUTH about it. The old sentence here said 「超过 24 条规则就写不进去了…先 consolidate」,
+  // which was wrong twice: the count is not what gates (characters are), and on the real
+  // library `consolidate` finds nothing to merge, so the named door was walled over.
   check(
-    'and warns that an umbrella has a hard ceiling and names the way out',
-    /24 条规则/.test(DISCIPLINE_SECTION) && /consolidate/.test(DISCIPLINE_SECTION),
+    'and says the count is advisory while the character ceiling is what refuses',
+    /条数只是提示线/.test(DISCIPLINE_SECTION) && /字符上限/.test(DISCIPLINE_SECTION),
+    DISCIPLINE_SECTION,
+  );
+  check(
+    'and never names consolidate as a door without checking it opens',
+    /dryRun=true/.test(DISCIPLINE_SECTION) && /有时候是堵死的/.test(DISCIPLINE_SECTION),
     DISCIPLINE_SECTION,
   );
 
@@ -2615,8 +2792,64 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
     new RegExp(`${ACTIONABLE_MAX_CHARS} 字`).test(learnDescription),
     learnDescription,
   );
+
+  // ------------------------------- the three copies of the discipline agree
+  // Hermes's count: the same instructions live in THREE places — this section, the `learn`
+  // tool's description, and the always-on skill file — and only this one had been re-united
+  // around the task-level unit. Under the `minimal`-family presets the tool description is
+  // the only copy that arrives, so a copy that still says 「每个回合」 is the copy that
+  // teaches the model to manufacture one rule per turn. That divergence has no other way to
+  // show up: all three would still read as reasonable prose.
+  const residentSkill = defaultSkillText();
+  const copies = { DISCIPLINE_SECTION, 'learn tool description': learnDescription, 'self-learning-loop': residentSkill };
+  for (const [where, text] of Object.entries(copies)) {
+    check(`${where} states the unit as the task, not the turn`, /单位是任务，不是回合/.test(text) || where === 'DISCIPLINE_SECTION', where);
+    check(`${where} no longer says 「每个回合结束后」`, !/每个回合结束后/.test(text), where);
+  }
+  check(
+    'and the resident skill writes down the sentence that keeps the unit honest',
+    /多数`任务`里至少有一件值得记的/.test(residentSkill) && /多数`回合`里没有/.test(residentSkill),
+    residentSkill.slice(0, 400),
+  );
+  check(
+    'and the resident skill routes self-referential lessons to the fourth umbrella',
+    /agent-engineering/.test(residentSkill),
+    residentSkill.slice(0, 400),
+  );
+  check(
+    'and the tool description route matches the resident skill',
+    /agent-engineering/.test(learnDescription),
+    learnDescription,
+  );
+  check(
+    'and the umbrella parameter offers all four, not the three it was created with',
+    String(tools.learn.parameters?.properties?.umbrella?.enum || '').includes('agent-engineering') ||
+      JSON.stringify(tools.learn.parameters || {}).includes('agent-engineering'),
+    JSON.stringify(tools.learn.parameters?.properties?.umbrella || {}),
+  );
+
+  // ------------------- the protected list is derived, not a second truth
+  // `agent-engineering` was created as the fourth umbrella and `BUILTIN_PROTECTED` stayed a
+  // hand-written array of four names, so the newest umbrella was archivable after 30 idle
+  // days, deletable through `learn_skill_manage delete`, and invisible to
+  // `migrateOwnSkills`'s ownership test — with nothing failing loudly anywhere.
+  check(
+    'every umbrella is protected by construction',
+    Object.keys(UMBRELLAS).every((name) => managed.BUILTIN_PROTECTED.includes(name)),
+    managed.BUILTIN_PROTECTED.join(', '),
+  );
+  check(
+    'and the resident skill is protected alongside them',
+    managed.BUILTIN_PROTECTED.includes(DEFAULT_SKILL_NAME),
+    managed.BUILTIN_PROTECTED.join(', '),
+  );
+  check(
+    'and the list has no name that is not an umbrella or the resident skill',
+    managed.BUILTIN_PROTECTED.every((name) => name === DEFAULT_SKILL_NAME || Object.keys(UMBRELLAS).includes(name)),
+    managed.BUILTIN_PROTECTED.join(', '),
+  );
   wired.dispose();
-  sameList('disposal reaches every registration', disposed.sort(), ['guard', 'learn-discipline', 'learn-queue']);
+  sameList('disposal reaches every registration', disposed.sort(), ['guard', 'learn-discipline', 'learn-queue', 'learn-rules']);
 }
 
 // ============================================================ 11b. safety

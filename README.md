@@ -13,7 +13,7 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 23 节 712 条断言，浏览器半边 454 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 23 节 754 条断言，浏览器半边 454 条，零依赖 |
 
 ---
 
@@ -274,7 +274,7 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 - `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
 - 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
 
-自检现在 **23 节 712 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+自检现在 **23 节 754 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
 
 ### v0.3.2：变异测试没抓住的那几个守卫
 
@@ -606,7 +606,33 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 **四、上限不叫「软上限」。** 四处文案（`lib/review.js` 两处、`lib/tools.js` 一处、README 配置表）把它写成「软上限」，而闸门 `if (overBudget && source !== 'user-request')` 是**直接拒绝**。一个自称软的限额就是没人会去合并的限额。四处全部改口，并加了一条断言：**任何 `lib/*.js` 都不许再出现「软上限」**。
 
-**自检：23 节 712 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 754 条断言**（浏览器半边 454 条），全绿。
+
+---
+
+### v0.3.11：上限得是扇门，规则得进上下文
+
+这一版修的是 Hermes 第三轮审查提的八条。前七条落地了，第八条**故意没做**，理由写在最后。
+
+**一、规则上限从「一堵墙」改成「一扇门」。** v0.3.9 把上限做成硬的，硬得没有出口：它数**条数**，而真实技能库里 `tool-recovery` 37 条、`environment-facts` 27 条，都对 24 条的上限，于是**两把伞拒绝一切新写入**；拒绝语说「先 `consolidate` 合并同类规则」，而对着真实技能库跑只读的 `consolidate --dry-run`，四把伞里**一处近似重复都没有**，账本里 `review.consolidate` 也是 0 行。写 → 拒 → 让你去合并 → 没得合并 → 再写。更糟的是 `source: 'promoted'` 也被同一道门拒绝，于是 `learn action=pending` 自己打印出来的那条命令 `learn action=restore-pending fp=…` **保证失败**。
+
+现在拦人的是**正文字符数**（`RULE_BUDGET_CHARS = 9000`，约 2.2k token——仍然是一把模型能整篇读完的伞，这正是条数想代理的那个性质），条数（`RULE_BUDGET = 24`）降级成**提示线，只报告不拦人**。拒绝时不再念口号：`budgetExits(name)` 自己跑一次只读的 `consolidate --dry-run`，有近似重复就给出确切的 `dryRun=false` 命令；一处都没有，就直说「这扇门是堵死的」，然后给两扇真门——`learn action=undo` 退掉最旧的一条，或者承认一把伞装不下这一类、用 `learn_skill_manage create` 分家。`promoted` 和 `user-request` 两个来源豁免：一个是人亲手挑的候选，一个是用户亲口说的「记住」，上限不是不听话的理由。
+
+**二、`doctor` 可以「警告」了。** 上面那个计数上限让 `doctor` 在真实技能库上**永久变红**，却没有任何一个操作能让它变绿——正是 v0.2.3 第 27 条修过的那个缺陷，换了个检查项又长回来。现在 `add(id, ok, detail, level)` 支持 `'warn'`，`doctor()` 返回 `{ ok, checks, issues, warnings }`：正文到顶是 error，条数过线是 warn（「还没到硬上限，新的写法仍然写得进去，但该考虑 consolidate 或分家了」）。
+
+**三、三份纪律终于说同一件事。** 同一套指令活在三个地方——`DISCIPLINE_SECTION`、`learn` 工具的描述、常驻技能文件——而只有第一份被改成任务级单位。后果是：`minimal` 那一族预设里（persona `complete: true` 会把整份系统提示词压成一段）**只有工具描述送得进去**，而它教的是回合级。三份现在都写着「单位是任务，不是回合：多数任务里至少有一件值得记的，多数回合里没有，那是正常的——为了凑满「每回合一条」而编出来的规则，下次会以既成做法的身份回来。」，自检逐份断言，并且**任何一份都不许再出现「每个回合结束后」**。
+
+**四、规则终于进上下文了。** 这是输出端：20 个最近会话、约 3 万事件里，`learn*` 调用 138 次，`skill` 加载 2 次，**`learn_skills`（检索入口）0 次**，`usage.json` 从未被创建——规则一直在写，几乎从没被读过，`curator` 的「被加载 ≥3 次」保活因此永远不可能触发。现在新增第三个提示词段 `learn-rules`（`order: 92`），内容是**有界、确定**的规则摘录：`durable-preferences` 全列（那是用户亲口说的偏好，本来就该短），任务伞只列最新三条（最新的那条正是这个会话刚教的），超出 1200 字符就截断，一句都没学过时整段为空、一个 token 都不花。**确定性就是性能合同**：同样的规则文件必须渲染出同样的字节，否则每一轮都会让前缀缓存失效——所以这里故意**不加记忆缓存**，缓存只会多出一个「摘录过期」的 bug 类别。
+
+**五、`agent-engineering` 进了保护名单，而且是从 `UMBRELLAS` 推导出来的。** `BUILTIN_PROTECTED` 原先是手写的四个名字，第四把伞建出来时没人想起它，于是它 30 天不活动就可能被 curator 归档、能被 `learn_skill_manage delete` 删掉、也进不了 `migrateOwnSkills` 的归属判断——而且不会有什么东西大声失败。现在 `Object.freeze([DEFAULT_SKILL_NAME, ...Object.keys(UMBRELLAS)])`，一份真相。
+
+**六、`state.json` 有 schema 了。** 四个字段（`review_count` / `last_review_summary` / `last_review_session` / `learned_root_*`）写了从没人读。`STATE_KEYS` 白名单 11 个键，读和写都只过白名单，未声明的键在写入时就被剪掉。`lib/index.js` 里那三个 `learned_root_live` / `learned_root_checked_at` / `learned_root_reason` 整块删除——同一件事的第三份拷贝：探针每次激活都会重跑，`skills.isLive()` 是内存里的答案，`learn action=doctor` 按需重新推导 `host-root`。
+
+**七、规则改写上锁，`lessons.jsonl` 学会轮转。** `remember()` 的「读规则 → 重排 → 整文件写」现在包在 `store.withLock` 里：`skills.write` 的 tmp+rename 保证文件**不会写坏**，不保证这个读改写**不会交错**——主会话和子代理同时写，或者写规则撞上 curator 归档，都会丢一条规则。锁只覆盖文件那一段，因为 `withLock` **不可重入**（它在 `openSync(files.lock, 'wx')` 上自旋到超时），把后面的 `dropProposal` 也包进去会死锁。`lessons.jsonl` 则在 48KB 且只增不减地长着，而同一个进程写的账本有 2MB 轮转——轮转写过一次，只为其中一个文件写过。现在抽成 `rotateIfHuge(file, { bytes, keep, prefix })`，两个文件共用，规则是「谁追加，谁先轮转」。
+
+**八、回执看不见自动路径——这条故意没做。** 事实核对过：`learn` 的自动路径（审查 → 候选 → `source: 'user'` + `remember-request` 时直接落盘）**不产生任何工具调用**，而回执只折叠 `learn*` 的工具调用，所以它写下的规则在界面上是零行。宿主侧的 API 也核实过（`wire` 不是服务，而是 `ProjectionDefinition` 上的可选字段；`ctx.sessionProjections.register()` 是标准扩展点，树内约 20 个插件在用它；`ctx.on('session/event')` + `wire.view` 会把值推给浏览器半边，浏览器侧经 `projections.faceOf(key)` 读）。没有做，是因为**浏览器半边的消费者没法在没有重启的情况下验证**，而这个插件自己的纪律第一条就是「加一个键，必须同时加它的读者」——先发一个没有读者的生产者，正是它一路在抓的那个缺陷。所以这一版只**说实话**：回执反映的是模型**主动**调用的 `learn*`，自动路径写下的规则**不会**出现在回执里；想知道这个会话到底学没学到东西，看 `learn action=status` 的「本会话」行，或者 `learn action=doctor` 的 `host-hooks`。
+
+**自检：23 节 754 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -830,7 +856,7 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-712/712 checks passed — all green
+754/754 checks passed — all green
 454/454 checks passed
 ```
 
