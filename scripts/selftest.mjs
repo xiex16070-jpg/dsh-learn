@@ -2681,6 +2681,30 @@ start('host — the guard refuses the wrong door and the nudge stays quiet when 
     !excerpt.includes(DEFAULT_SKILL_NAME),
     excerpt.slice(0, 200),
   );
+
+  // The budget decides how MUCH of each umbrella is shown, never WHICH ones
+  // exist. The first version rendered as it walked and `break`-ed when the budget
+  // ran out — an alphabetical lottery. Measured the moment v0.3.11 loaded: the
+  // live prompt showed `durable-preferences`, `agent-engineering` and
+  // `environment-facts`, and `tool-recovery` (38 rules, the umbrella most likely
+  // to matter) contributed nothing at all, so a model reading its own prompt could
+  // not tell the skill existed.
+  const fatRule = (i) => ({ text: `第 ${i} 条：${'把命令写对再谈顺序和风格。'.repeat(8)}` });
+  const fatSkills = {
+    list: () =>
+      ['durable-preferences', 'agent-engineering', 'environment-facts', 'tool-recovery'].map((name) => ({ name })),
+    readRules: (name) =>
+      name === 'durable-preferences' ? [fatRule(0)] : Array.from({ length: 30 }, (_, i) => fatRule(i)),
+  };
+  const tight = ruleExcerpt(fatSkills, { maxChars: 900 });
+  for (const name of ['durable-preferences', 'agent-engineering', 'environment-facts', 'tool-recovery']) {
+    check(`the excerpt names ${name} even under budget pressure`, tight.includes(name), tight);
+  }
+  check('and stays inside the budget it was given', tight.length <= 900, String(tight.length));
+  check('and is still deterministic under pressure', ruleExcerpt(fatSkills, { maxChars: 900 }) === tight);
+  const tiny = ruleExcerpt(fatSkills, { maxChars: 40 });
+  check('with no room for rules it still names every umbrella', tiny.includes('tool-recovery'), tiny);
+  check('and does not exceed even that absurd budget by much', tiny.length <= 400, String(tiny.length));
   check('the discipline section states the refusals', /不值得写的/.test(DISCIPLINE_SECTION));
   check('and the backtick rule that the gate actually enforces', /反引号/.test(DISCIPLINE_SECTION));
   // The prompt must state the LENGTH limit too, and state the real number: a
