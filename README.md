@@ -1,6 +1,6 @@
 # dsh-learn — DSH 的持久学习回路
 
-**Persistent learning for DeepSeek Harness.** A Cordis plugin that turns a session's corrections, failures and fixes into ordinary DSH skills — so the next session starts already knowing them. Zero extra model calls. Never touches the prompt or the history.
+**Persistent learning for DeepSeek Harness.** A Cordis plugin that turns a session's corrections, failures and fixes into ordinary DSH skills — so the next session starts already knowing them. Zero extra model calls. Keeps the system prompt stable; recall travels through the host's runtime-context channel.
 
 ![cover](docs/shots/01-cover.png)
 
@@ -13,13 +13,13 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 23 节 762 条断言，浏览器半边 454 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 23 节 808 条断言，浏览器半边 454 条，零依赖 |
 
 ---
 
 ## 它是什么
 
-`dsh-learn` 挂在会话事件流上，把每个回合里出现的**纠正、失败与修法**蒸成类级技能，写进技能库，让下一个会话能用 `learn_skills` 找到、能被模型当技能加载。它自己不做判断：确定性路径（正则 + 门槛）只**产出候选**，写盘必须由模型显式决定。技能落在一个专属技能根里，状态、账本、候选与归档落在 `<DSH_HOME>/learn/data/`。整个过程**零额外模型调用**，也**从不读写会话历史或系统提示词**。
+`dsh-learn` 挂在会话事件流上，把每个回合里出现的**纠正、失败与修法**蒸成类级技能，写进技能库，让下一个会话能用 `learn_skills` 找到、能被模型当技能加载。它自己不做判断：确定性路径（正则 + 门槛）只**产出候选**，写盘必须由模型显式决定。技能落在一个专属技能根里，状态、账本、候选与归档落在 `<DSH_HOME>/learn/data/`。整个过程**零额外模型调用**；纪律是字节稳定的系统提示段，队列与规则摘录走宿主专门的 runtime context，不改写持久会话历史，也不让系统提示在会话中途变化。
 
 它不发明新的文件格式，也不维护第二套目录：学到的技能就是**普通的 DSH 技能**——宿主的技能提供者扫得到，`/名字` 能加载，别的工具也读得懂。插件只是往那个目录里写，并记住自己写过什么。
 
@@ -32,10 +32,10 @@
 | 常见的做法 | dsh-learn 的做法 | 为什么 |
 |---|---|---|
 | 回合结束后 fork 一个模型做后台复盘 | 只观察 `session/event`（`user/message`、`assistant/message`、`tool/result`），在内存里留一个有上限的蒸馏窗口（`capture.maxSessions` 个会话 × `maxItemsPerSession` 条） | 复盘要一次真实 API 调用，而且它看到的上下文已经和当前回合不一致；观测现有事件流是零成本的，且永远和真实发生的事一致 |
-| 把 transcript 重新灌进一个 cache-warm prompt | 永不触碰对话与提示词 | 宿主的**前缀缓存是不变量**，注入在实践中不可撤销 |
+| 把 transcript 重新灌进一个 cache-warm prompt | 系统提示保持不变；只把有界的队列/规则摘录放进宿主的 runtime context | 宿主的**前缀缓存是不变量**；动态事实要走宿主为此设计的 user-role snapshot 通道 |
 | 由那个后台模型决定存什么 | 前台模型决定；正则只负责提出候选 | 判断「这条是不是可迁移的类级做法」需要语义理解，正则做不到——v0.1.0 的事故就是证据（见下） |
 | 维护一套自己的记忆存储 | 直接写普通技能文件 | 用户能读、能改、能删、能版本控制；不需要让宿主多认一种格式 |
-| 一个无所不包的 `MEMORY.md` | 三个类级**伞技能**（`durable-preferences` / `tool-recovery` / `environment-facts`），每个只有一个写入目标 | 同一个事实只有一个家，不会散落多处互相矛盾 |
+| 一个无所不包的 `MEMORY.md` | 四个类级**伞技能**（`durable-preferences` / `tool-recovery` / `environment-facts` / `agent-engineering`），每个只有一个写入目标 | 同一个事实只有一个家，不会散落多处互相矛盾 |
 | 归档 = 删除 | `curator.js`：只归档、从不删除；每 10 分钟问一次「到期了吗」，真正跑不跑由空闲与周期两道闸门决定 | 「忘掉」应该是可逆的；移出去的目录随手移回来就恢复了。问得勤不等于跑得勤——检查只读一次状态 |
 | 配置项越多越好 | 加一个键，必须同时加它的读者——而且现在有测试盯着 | v0.2.0 删掉了 5 个没人读的安慰剂配置；v0.2.3 又长出 3 个（`review.ruleBudget` / `similarity` / `maxProposals`），v0.3.0 把它们接上了线，并加了一节断言：注册表里每个键都必须在 `lib/config.js` 之外有人读 |
 
@@ -44,7 +44,7 @@
 1. `session/event` 进来 → `curator.touch()` 记一次活动。
 2. `capture` 把用户/助手/工具事件脱敏、压缩、按信号分类，塞进当前会话的内存窗口。**来源纪律在这一层强制**：用户文本只允许产出 `REMEMBER_REQUEST` / `USER_CORRECTION` / `USER_PREFERENCE` / `DURABLE_FACT`，助手文本只允许 `TECHNIQUE` / `SKILL_WRONG` / `RECOVERED_FAILURE`，工具结果只允许 `RECOVERED_FAILURE` / `TECHNIQUE` / `TOOL_FAILURE_OPEN`（`text.js` 的 `SOURCE_KINDS`）。
 3. `agent/turn-stopping` → 防抖 4 秒后跑一次 `runReview(session, {dryRun:false})`。它**只写候选**到 `pending.json`，并且只在窗口观测数 ≥ `review.triggerObservations`（默认 3）时才跑。回合边界只负责调度，绝不 await——自我改进不能拖慢用户的回合。
-4. 模型看 `learn action=pending`，自己决定要不要写：`learn_skill_manage create`（新技能）或 `learn action=note`（往三把伞里加一条规则）。两条路都过同一套门槛与同一套内容卫生。
+4. 模型看 `learn action=pending`，自己决定要不要写：`learn_skill_manage create`（新技能）或 `learn action=note`（往四把伞里加一条规则）。两条路都过同一套门槛与同一套内容卫生。
 5. 命中 `tokenSimilarity ≥ 0.6` 的既有规则会被**强化**（记一次命中、进 lessons）而不是复制一条。
 6. curator 自带定时器（**每 10 分钟问一次是否到期**，那一次检查只读一个状态字段），只在**空闲且距上次维护够久**时把 `staleAfterDays`（14 天）以上的受管技能转成 `stale`、`archiveAfterDays`（30 天）以上的**移进归档目录**。被加载过 3 次以上的技能只标 `stale`、不自动归档——「有人还在用」比文件时间更可信。
 
@@ -274,7 +274,7 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 - `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
 - 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
 
-自检现在 **23 节 762 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+自检现在 **23 节 808 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
 
 ### v0.3.2：变异测试没抓住的那几个守卫
 
@@ -606,7 +606,7 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 **四、上限不叫「软上限」。** 四处文案（`lib/review.js` 两处、`lib/tools.js` 一处、README 配置表）把它写成「软上限」，而闸门 `if (overBudget && source !== 'user-request')` 是**直接拒绝**。一个自称软的限额就是没人会去合并的限额。四处全部改口，并加了一条断言：**任何 `lib/*.js` 都不许再出现「软上限」**。
 
-**自检：23 节 762 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -632,7 +632,7 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 **八、回执看不见自动路径——这条故意没做。** 事实核对过：`learn` 的自动路径（审查 → 候选 → `source: 'user'` + `remember-request` 时直接落盘）**不产生任何工具调用**，而回执只折叠 `learn*` 的工具调用，所以它写下的规则在界面上是零行。宿主侧的 API 也核实过（`wire` 不是服务，而是 `ProjectionDefinition` 上的可选字段；`ctx.sessionProjections.register()` 是标准扩展点，树内约 20 个插件在用它；`ctx.on('session/event')` + `wire.view` 会把值推给浏览器半边，浏览器侧经 `projections.faceOf(key)` 读）。没有做，是因为**浏览器半边的消费者没法在没有重启的情况下验证**，而这个插件自己的纪律第一条就是「加一个键，必须同时加它的读者」——先发一个没有读者的生产者，正是它一路在抓的那个缺陷。所以这一版只**说实话**：回执反映的是模型**主动**调用的 `learn*`，自动路径写下的规则**不会**出现在回执里；想知道这个会话到底学没学到东西，看 `learn action=status` 的「本会话」行，或者 `learn action=doctor` 的 `host-hooks`。
 
-**自检：23 节 762 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -653,7 +653,23 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 现场验证（真实技能库、真实代码）：`1107/1200` 字符，四把伞全部出现，而且刚写进去的那条 PowerShell 规则就在 `tool-recovery` 的最上面——**写进去，下一次就读得到**，这个回路第一次在数据里闭上。
 
-**自检：23 节 762 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
+
+---
+
+### v0.3.13：宿主语义复核——缓存、守卫与失败恢复
+
+这轮不是再看一遍插件自己的说明，而是把正式桌面端 `app.asar` 里的 `dsh-system-prompt`、`dsh-agent-loop`、三套文件工具与当前插件逐行对接。自测全绿仍然漏了几类“单独看都对，接到宿主就错”的问题：
+
+- **动态记忆不再改系统提示。** 宿主每个 model step 都重新 `assemble()`；把队列和规则摘录注册成带函数的 `systemPrompt.section()`，一旦学习状态变化就会在同一会话里改变 system prompt，破坏前缀缓存。现在只有纪律段留在 `section()`，`learn-queue` 与 `learn-rules` 改走 `systemPrompt.context()`；动态文本里的 `{{…}}` 也会先转义，避免被宿主当成未知提示变量。
+- **守卫覆盖真实编辑面。** 共享根的守卫以前创建时漏传 `managed`，导致专用根未生效时，本插件自己放在 `<DSH_HOME>/skills` 下的技能可以被直接改；另外宿主还有 `str_replace_editor`，原守卫只认识 `write` / `edit`。现在托管清单一路传到 guard，并拦住 `str_replace_editor` 的 `create` / `str_replace` / `insert`，只读 `view` 仍放行。相对路径按宿主同一条规则解析到 `exec.agent.session.header.cwd` 后再比较；路径归一化也修掉了 `C::/…` 的双冒号，并保留 UNC 根、按 Windows 语义忽略 UNC 大小写。原始 shell 无法靠文件工具守卫可靠解析，因此纪律明确要求不要用 shell 改技能文件。
+- **内容卫生收回唯一写入口。** `screenDescription()` 会拒绝注入与超预算描述，但 `skills.write()` 中间层把 `refused` 丢了；绕过工具层的内部调用仍能落盘。现在拒绝原因贯穿 `fitDescription()` → `buildSkillFile()` → `skills.write()`。规则正文里的 `<!--` / `-->` 也会在生成锚点前失活，不再吞掉 provenance 和 `r:<id>`；候选、规则返回值、lessons 与嵌套 ledger 样本共用脱敏漏斗。没有空格的中文或长 token 也会真正按 240 字硬折行，不再只有“已折行”的注释而没有折行行为；但带稳定锚点的规则是一个可撤销记录，不能把锚点折到下一行，因此 640 字以内保持单行，超过就明确拒绝。
+- **长度旋钮终于生效。** `condense(text, {maxChars})` 改过签名后，十几处调用仍传数字；JavaScript 不报错，只把每个 `80 / 120 / 160 / 200 / 400` 悄悄当成默认 240。现在同时兼容数字与对象，两套调用都由断言钉住，队列、账本、捕获窗口和规则渲染各自使用自己声明的预算。
+- **审阅失败可重试，状态不再说谎。** `reviewedRevision` 从“开始审阅时写”改成“队列、账本与状态全部成功后提交”；IO 异常不会把窗口永久标成已审。每条观测在自己的持久化完成后立刻标记，后面一条失败再重试时，前面那条不会被算成第二次佐证。`sessionView.judged` 报真实已审 revision，而不是照抄当前 revision；候选的 `duplicateOf` / 相似说明在同一次 `pending.json` 事务里持久化；`summary.totalRules` 数磁盘上现存规则，历史写入另列 `totalWritesInLedgerWindow`。
+- **规则写入的一致性与预算一起进锁。** 去重、预算判断、构造正文、整文件替换现在处在同一把锁里，并按“加入这一条后的正文长度”判断上限；两个会话不能再同时从旧快照得出“可写”并制造双胞胎或越线。
+- **热重载不再留下幽灵钩子。** 技能根探测是异步的；插件如果在探测返回前已被卸载，旧实例以前仍会在 `.finally()` 里重新注册 context 与 guard。现在清理先标记 `disposed`，迟到的探测只结束自己，不碰替换实例。
+
+**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -666,7 +682,8 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 │   │   ├── self-learning-loop/SKILL.md     # 插件自己的常驻技能，激活时写入
 │   │   ├── durable-preferences/SKILL.md    # 伞：用户长期偏好
 │   │   ├── tool-recovery/SKILL.md          # 伞：工具/命令失败后的排查与恢复
-│   │   └── environment-facts/SKILL.md      # 伞：环境与项目约定
+│   │   ├── environment-facts/SKILL.md      # 伞：环境与项目约定
+│   │   └── agent-engineering/SKILL.md       # 伞：代理、提示词与 harness 工程做法
 │   ├── <本插件还没搬过来的技能>       # 探测通过前的新技能、用户自己写的技能
 │   └── <其它技能根，不归本插件管>
 ├── learn/data/                      # config.dataDir
@@ -699,7 +716,7 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 几个约定：
 
-- `learn action=note` 与 `learn_skill_manage create` 的差别是**落点**：前者往三把伞里加一条规则（走 `review.remember()` 的门槛与去重），后者是独立技能文件。
+- `learn action=note` 与 `learn_skill_manage create` 的差别是**落点**：前者往四把伞里加一条规则（走 `review.remember()` 的门槛与去重），后者是独立技能文件。
 - `learn_skill_manage` 的 `description` **必填**——它是未来唯一的路由信号；超过 500 字会**拒收**（不是截断），理由里直接说「被截掉的往往正是触发词」。
 - `learn_skill_manage create` 撞上已有技能时：本插件自己建的要 `overwrite=true`；**不是它建的**（不在 `managed.json`）要 `adopt=true`，否则拒绝覆盖用户自己写的技能。
 - `delete` / `archive` 的鉴权是函数第一句；`archive` 是移动，`delete` **默认也是先移动**（归档后返回路径、账本记 `recoverable: true`），只有 `confirm=true` 才真的 `rmSync`，两者都写账本（`skill.archive` / `skill.delete`）。
@@ -877,7 +894,7 @@ node scripts/selftest.mjs
 当前实际状态：
 
 ```
-762/762 checks passed — all green
+808/808 checks passed — all green
 454/454 checks passed
 ```
 
@@ -902,9 +919,9 @@ node scripts/selftest.mjs
 
 ## 设计不变量
 
-- **永不注入、永不改写系统提示词或历史。** 插件只读 `session/event`；这是宿主的 prompt-cache 不变量，也是它零额外模型调用的原因。
+- **系统提示词在会话中保持字节稳定，持久历史不改写。** 插件只读 `session/event`；会变化的候选队列与规则摘录走 `systemPrompt.context()`，由宿主投影成有来源的 user-role runtime snapshot，不塞进 system prompt。这是 prompt-cache 不变量，也是它零额外模型调用的原因。
 - **学到的技能就是普通的 DSH 技能**，不是第二套注册表、不是私有格式。能被宿主的技能目录扫到，能被 `/名字` 加载，也能被别的工具读。
 - **每个破坏性操作都先校验、后留痕。** 鉴权（`managed.canDestroy()`）是第一句；成功与否都写 `ledger.jsonl`。
 - **归档从不删除。** `archive` 是把目录移出活动根，随手移回来就能恢复；只有显式的 `delete` 才真的删。
-- **不显式 `adopt` 就永远不碰不是自己创建的技能。** 技能根是多个来源共享的，自动流程只碰 `managed.json` 里记着的那些；保护名单（`self-learning-loop` 与三把伞）连显式操作都拒绝归档。
+- **不显式 `adopt` 就永远不碰不是自己创建的技能。** 技能根是多个来源共享的，自动流程只碰 `managed.json` 里记着的那些；保护名单（`self-learning-loop` 与四把伞）连显式操作都拒绝归档。
 - **空闲才维护，用户回合永远优先。** curator 跑自己的 unref 定时器，审查在回合边界只调度、不阻塞。
