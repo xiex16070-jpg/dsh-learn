@@ -13,7 +13,7 @@
 | 产出形态 | 普通 DSH 技能（`<DSH_HOME>/skills/learned/<name>/SKILL.md`），不是第二套注册表 |
 | 破坏性操作 | 先鉴权（`managed.json`）、后留痕（`ledger.jsonl`）、归档从不删除 |
 | 看得见的反馈 | 每个回合结束后，在回复下方留一行彩色回执，写清这个回合学到了什么 |
-| 自测 | `npm test` —— 宿主半边 23 节 808 条断言，浏览器半边 454 条，零依赖 |
+| 自测 | `npm test` —— 宿主半边 23 节 856 条断言，浏览器半边 454 条，零依赖 |
 
 ---
 
@@ -274,7 +274,7 @@ v0.2.3 之后有人把 16 个模块重读了一遍、自己跑了自测、在临
 - `ctx.tools.guard()` —— 关掉后门。技能库里的文件不再能被 `write` / `edit` 直接改：专属根整个是插件的，共享根**按技能名**判（共享根里还有别人的技能，一个拒绝 `<dshHome>/skills` 下一切路径的守卫，是在禁止别人改自己的文件）。路径比较是**词法归一化**的，所以 `…/learned/x/../../learned/x/SKILL.md` 这种爬出去再爬回来的写法照样拦得住。守卫在**探测之后**才挂——它要拿 `learnedDir` 做比较，而插件在那之前还不知道哪个根算数。
 - 队列提醒为什么不用 `agent.inject()`：`inject` 把消息放进收件箱但**不唤醒**智能体，所以它无法让模型在触发它的那个回合里动手；而它可以在队列被读取的那一刻再次触发——一个等着发生的循环。提示词段落每次都在同一个位置说同一件事，不会循环。
 
-自检现在 **23 节 808 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
+自检现在 **23 节 856 条断言**（浏览器半边 454 条）：新增 `host` 一节（守卫该拦的拦、不该拦的放行、`isInside` 的六条边界、队列为空时不产生一个字的提醒、钩子一个都挂不上时报出原因），`ledger` 一节（真实 hits 序列 `1,2,3,4,5`、轮转、有界读、`propose` 行确实变小），以及医生新增的 `host-hooks` 检查——**只有 `tools.guard` 挂了才算故障**：两段提示词是建议，而守卫是「技能只能经 `learn_skill_manage` 修改」这句话的凭据；没有它，那句话只是提示词里的说法。
 
 ### v0.3.2：变异测试没抓住的那几个守卫
 
@@ -606,7 +606,7 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 **四、上限不叫「软上限」。** 四处文案（`lib/review.js` 两处、`lib/tools.js` 一处、README 配置表）把它写成「软上限」，而闸门 `if (overBudget && source !== 'user-request')` 是**直接拒绝**。一个自称软的限额就是没人会去合并的限额。四处全部改口，并加了一条断言：**任何 `lib/*.js` 都不许再出现「软上限」**。
 
-**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 856 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -632,7 +632,7 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 **八、回执看不见自动路径——这条故意没做。** 事实核对过：`learn` 的自动路径（审查 → 候选 → `source: 'user'` + `remember-request` 时直接落盘）**不产生任何工具调用**，而回执只折叠 `learn*` 的工具调用，所以它写下的规则在界面上是零行。宿主侧的 API 也核实过（`wire` 不是服务，而是 `ProjectionDefinition` 上的可选字段；`ctx.sessionProjections.register()` 是标准扩展点，树内约 20 个插件在用它；`ctx.on('session/event')` + `wire.view` 会把值推给浏览器半边，浏览器侧经 `projections.faceOf(key)` 读）。没有做，是因为**浏览器半边的消费者没法在没有重启的情况下验证**，而这个插件自己的纪律第一条就是「加一个键，必须同时加它的读者」——先发一个没有读者的生产者，正是它一路在抓的那个缺陷。所以这一版只**说实话**：回执反映的是模型**主动**调用的 `learn*`，自动路径写下的规则**不会**出现在回执里；想知道这个会话到底学没学到东西，看 `learn action=status` 的「本会话」行，或者 `learn action=doctor` 的 `host-hooks`。
 
-**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 856 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -653,7 +653,7 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 现场验证（真实技能库、真实代码）：`1107/1200` 字符，四把伞全部出现，而且刚写进去的那条 PowerShell 规则就在 `tool-recovery` 的最上面——**写进去，下一次就读得到**，这个回路第一次在数据里闭上。
 
-**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 856 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -669,7 +669,7 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 - **规则写入的一致性与预算一起进锁。** 去重、预算判断、构造正文、整文件替换现在处在同一把锁里，并按“加入这一条后的正文长度”判断上限；两个会话不能再同时从旧快照得出“可写”并制造双胞胎或越线。
 - **热重载不再留下幽灵钩子。** 技能根探测是异步的；插件如果在探测返回前已被卸载，旧实例以前仍会在 `.finally()` 里重新注册 context 与 guard。现在清理先标记 `disposed`，迟到的探测只结束自己，不碰替换实例。
 
-**自检：23 节 808 条断言**（浏览器半边 454 条），全绿。
+**自检：23 节 856 条断言**（浏览器半边 454 条），全绿。
 
 ---
 
@@ -687,20 +687,24 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 │   ├── <本插件还没搬过来的技能>       # 探测通过前的新技能、用户自己写的技能
 │   └── <其它技能根，不归本插件管>
 ├── learn/data/                      # config.dataDir
-│   ├── state.json                   # 计数器、curator_last_run_at、curator_pinned、暂停位、learned_root_live
+│   ├── state.json                   # 计数器、curator_last_run_at、curator_pinned、暂停位（完整清单见 lib/storage.js 的 STATE_KEYS）
 │   ├── ledger.jsonl                 # 账本：每一次写、拒、归档、加载
 │   ├── pending.json                 # 候选队列 {version, updatedAt, items}
 │   ├── lessons.jsonl                # 落盘过的教训（create / reinforce）
 │   ├── managed.json                 # 归属清单：哪些技能是这个插件建的
-│   ├── usage.json                   # 使用遥测：loads / firstAt / lastAt / sessions
+│   ├── usage.json                   # 使用遥测：loads / firstAt / lastAt / sessions（只在真正被加载时计数，见下）
 │   ├── learning-graph.json          # 学习图（技能 / 教训 / 候选 / 灵枢 memory 节点）
 │   ├── last-error.log               # 内部警告（锁回收、写入被拒等）
 │   ├── .lock                        # 写锁（openSync 'wx'）
 │   └── archive/skills/<name>/       # 归档区：移动过来的，从没被删过
-└── .dsh-memory/data/mdcg/contextual # 灵枢 memory 节点来源（没有就跳过，不报错）
+└── .dsh-memory/data/mdcg/contextual # 灵枢 memory 节点来源（默认探测这个位置；不存在就不接，不报错；要改指向用 config.memoryRoot）
 ```
 
+> `config.memoryRoot` 非空时以它为准；为空时才去探测上面那条默认路径，**且只有目录真的存在才会被采用**。以前这里是无条件返回这条路径的——那是把别的插件的内部目录结构写死成了本插件的假设，对方一搬家，学习图里的 memory 节点就静默变成 0，既不报错也不提示。`learn action=status` 现在会直接说明接没接上。
+
 只有三个伞技能是长期存在的写入目标；`kind` 路由不到伞的教训**不会**新建技能，只留在账本里。
+
+> **`loads` 是怎么数出来的**：数在 `lib/provider.js` 的 `get()` 里——宿主真的来取这个技能正文的那一刻。`list()` 每次收集目录都会被调用，它说明不了「用过」，所以不计。此前这个数是从事件流里反推的（`tool/result` + 工具名 + 参数形状），而实盘上它一次都没命中过：`usage.json` 根本不存在，于是 `loads` 恒为 0，`curator` 里 `loads >= 3` 的「还在被人用，就别归档」条款**从未生效**——一个天天被加载、但从没被改写的技能，30 天后照样进归档。现在 `get()` 是唯一计数点；事件流那条路只保留一个职责：覆盖专用根还没生效时、技能还落在共享根（由宿主自己的文件系统 provider 服务）的那一段，且**只在共享根计数**，所以一次加载不会被记两次。
 
 ---
 
@@ -762,16 +766,17 @@ Hermes 的机制是：每轮结束后由**一个独立的后台审查 agent** �
 
 ## 五道门，以及拒收怎么读
 
-写库前过的是 `review.js` 的 `gatesFor()`，它按顺序产出**六项检查**：前五项就是「五道门」，第六项 `routed` 是伞路由检查，不属于那五道门。门本身在 `text.js` 里实现（`gateObservation` 与 `isActionable`），下表只说明每道门拒什么：
+写库前过的是 `review.js` 的 `gatesFor()`，它按顺序产出**五项检查**。门本身在 `text.js` 里实现（`gateObservation` 与 `isActionable`），下表只说明每道门拒什么：
 
 | 检查 | 拒绝什么 | 拒收理由（逐字） |
 |---|---|---|
 | `general`（可迁移） | 短于 8 字或长于 400 字的陈述 | `陈述过短` / `陈述过长（>400 字）` |
 | `actionable`（可执行） | `gateObservation()` 给出的**拒收代码**落在 `SHAPE_REFUSALS` 集合里——不是靠匹配对方的中文措辞（v0.1–v0.3.0 是靠 `/可迁移\|具体对象/`，正是本插件自己警告过的坏形状） | `读不出可迁移的做法或具体对象` |
-| `durable`（持久） | 恒定通过——持久性在分类阶段就保证了 | — |
 | `no-incident`（无事故绑定） | 含 `PR/issue/ticket #N` 或 `YYYY-MM-DD` 日期 | `含日期或工单号` |
 | `routed`（伞路由） | `classifyRoute()` 给不出伞的教训（**不新建技能**） | `没有匹配的类级技能（不新建技能）` |
 | `novel`（非重复） | 这条已经写成规则了（指纹比对 `seen.json` 与本插件写过的全部规则）；队列里的重复不算——重复投递是加一次 hit，不是拒绝 | `这条已经写成规则了（同样的候选不会再提一次）` |
+
+这里原本还有第六项 `durable`，写法是 `push('durable', true, '')`：它不可能失败，却被当成「检查过」打印出来。持久性其实在上游就判了——`gateObservation()` 在教训到达这几道门之前，就已经用 `one-off` 代码把一次性要求拒收了，所以这里再判一次只可能得到同样的答案。**一个不可能失败的检查，是回执替读者做出的一个声明**，所以它被删掉，而不是留在表里显得周全。
 
 `gateObservation()` 现在除 `reasons` 外还返回 `codes`（`empty` / `short` / `long` / `redacted` / `command-dump` / `meta-discussion` / `unresolved` / `one-off` / `incident` / `data-dump` / `status` / `tool-envelope` / `no-error-shape` / `env-state` / `negative-claim` / `durable-task-directive` / `durable-work-report` / `durable-no-object` / `not-actionable`）。**理由给人看，代码给代码看**——两者一一对应，自测里有一条断言逼着它们等价。
 
@@ -853,9 +858,10 @@ learn action=doctor      # root / skills / host-root / legacy / budget / sidecar
 | 键 | 默认 | 含义 |
 |---|---|---|
 | `enabled` | `true` | 关掉后 `apply` 直接返回，一个工具都不注册 |
-| `skillsRoot` | `<DSH_HOME>/skills` | 技能根的**父**目录；真实的根是它下面的 `learned/`（`skills.learnedDir`） |
+| `skillsRoot` | `<DSH_HOME>/skills/learned` | 专用技能根（`skills.learnedDir`）：本插件自注册的 provider 覆盖它 |
 | `legacySkillsRoot` | `<DSH_HOME>/skills` | 共享根：专用根被宿主确认可见之前的落点，也是 `organize` 的迁移源 |
 | `dataDir` | `<DSH_HOME>/learn/data` | 状态、账本、候选、归档 |
+| `memoryRoot` | `''` | 学习图读 memory 节点的目录。空 = 探测 `<DSH_HOME>/.dsh-memory/data/mdcg/contextual`，且**只在该目录存在时**采用；非空则直接用它。接没接上由 `learn action=status` 明说 |
 | `capture.maxSessions` | `8` | 内存里同时保留几个会话的窗口（LRU） |
 | `capture.maxItemsPerSession` | `120` | 单会话观测上限 |
 | `capture.maxItemChars` | `400` | 单条观测压缩后的字符上限 |
@@ -866,11 +872,17 @@ learn action=doctor      # root / skills / host-root / legacy / budget / sidecar
 | `review.triggerObservations` | `3` | 窗口里有多少条观测才值得跑审查 |
 | `review.ruleBudget` | `24` | 一把伞的规则上限。到了之后新的自动写入会被**拒绝**，只有 `consolidate` 能腾位置；用户明确说「记住」的那一条是唯一例外 |
 | `review.similarity` | `0.6` | 去重/强化的相似度阈值 |
-| `curator.staleAfterDays` | `14` | 超过多少天没被加载 → `stale` |
-| `curator.archiveAfterDays` | `30` | 超过多少天没被加载 → 归档（移动，不是删） |
+| `curator.staleAfterDays` | `14` | 超过多少天没被**写入或加载** → `stale` |
+| `curator.archiveAfterDays` | `30` | 超过多少天没被**写入或加载** → 归档（移动，不是删） |
 | `curator.minIdleHours` | `2` | 空闲门槛：会话活跃时不整理 |
 | `curator.intervalHours` | `24` | 两次维护的最小间隔 |
 | `curator.pinned` | `[]` | 被 pin 的技能跳过一切自动流转 |
+
+> **周期与 Hermes 的差别，是有意的**：Hermes 的 `DEFAULT_INTERVAL_HOURS` 是 `24 * 7`（168 小时），这里是 `24`。本插件的技能库比 Hermes 的记忆文件小得多、也更便宜（归档只是移动目录，且 `staleAfterDays=14` / `archiveAfterDays=30` 都远大于 24 小时），所以更短的检查周期只是更早发现陈旧，不会更早动刀。要贴回 Hermes 的节奏，把 `curator.intervalHours` 设成 `168` 即可。
+
+> **`pause` 是状态位，不是配置键**：`learn_curator action=pause` 写进 `state.json`，自动维护（定时器）与显式 `run` 都会读它；`force=true` 是唯一能绕过它的路径。Hermes 的 `should_run_now()` 一直把 `paused` 当闸门的一部分，这里此前只在显式 `run` 那一条路上判过——工具打印「自动维护已暂停」，定时器却照跑。
+
+> **唯一一处已知做不到的保护**：Hermes 会把被 cron job 引用的技能排除在归档之外（`_cron_referenced_skills()`），本插件做不到，因为宿主没有暴露 automations 服务（它发布的只有 `agents` / `sessions` / `skills` / `storage` / `tools`）。去磁盘上读那份存储会是刚刚从 `findMemoryRoot` 里删掉的那种「把别人的内部布局写死」的错误，所以不做。替代手段是现成的：`learn_curator action=pin name=<技能>` 让该技能跳过一切自动流转。若将来宿主提供 automations 服务，正确的形状是给 `pinnedSet()` 再加一个来源，而不是另开一条保护路径。
 
 `dshHome` 的解析顺序：`config.dshHome` → `config.dsh_home` → 环境变量 `DSH_HOME` → `~/.dsh`。
 

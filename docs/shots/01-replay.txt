@@ -1,0 +1,226 @@
+回放库：C:\Users\admin\AppData\Local\Temp\learn-shots
+注册工具：learn, learn_review, learn_curator, learn_skill_manage, learn_skills
+
+session-5fc51e8e-256d-48c6-88dd-6f2b9e896985
+  事件 11419（用户 43 · 助手 1841 · 工具 1917）
+
+=== 自动审查（只提出候选，不写文件）===
+{
+  "ok": true,
+  "dryRun": true,
+  "sessions": [
+    {
+      "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+      "observations": 120,
+      "filed": 8,
+      "pendingTotal": 0,
+      "proposals": [
+        {
+          "dryRun": true,
+          "id": "o144",
+          "kind": "REMEMBER_REQUEST",
+          "kinds": [
+            "REMEMBER_REQUEST",
+            "USER_CORRECTION",
+            "DURABLE_FACT"
+          ],
+          "source": "user",
+          "statement": "重新审完了。方法：读全部 16 个模块（6900+ 行），**亲自跑了一遍它的自测**，在临时 DSH home 里做了两个针对性探针，并把盘上真实数据与 README 的每一条声明对了一遍。 ## 一、结论先说 这是一次**认真的重写**，不是应付：上一轮我点出的 12 条问题基本全部核销，其中 4 条是被\"结构性地\"解决的（不是打补丁）。方向也对——它接受了我最关键的那条建议：**确定性路径只提议、判决交给模型**。 但它把\"写入权交给模型\"之后，**没有造出任何叫模型…",
+          "weight": 6,
+          "hits": 1,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:28.546Z",
+          "notes": [
+            "疑似一次性要求"
+          ],
+          "umbrella": "durable-preferences"
+        },
+        {
+          "dryRun": true,
+          "id": "o130",
+          "kind": "RECOVERED_FAILURE",
+          "kinds": [
+            "TOOL_FAILURE_OPEN",
+            "RECOVERED_FAILURE"
+          ],
+          "source": "tool",
+          "tool": "pwsh",
+          "statement": "pwsh: ===== 01-replay.txt ===== 回放库：C:\\Users\\admin\\AppData\\Local\\Temp\\learn-shots 注册工具：learn, learn_review, learn_curator, learn_skill_manage, learn_skills session-5fc51e8e-256d-48c6-88dd-6f2b9e896985 事件 6440（用户 31 · 助手 1028 · 工具 1086） ===…",
+          "weight": 4,
+          "hits": 2,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:29.490Z",
+          "notes": [],
+          "umbrella": "tool-recovery"
+        },
+        {
+          "dryRun": true,
+          "id": "o156",
+          "kind": "RECOVERED_FAILURE",
+          "kinds": [
+            "TOOL_FAILURE_OPEN",
+            "RECOVERED_FAILURE"
+          ],
+          "source": "tool",
+          "tool": "edit",
+          "statement": "edit: Error: cannot modify \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\scripts\\client-check.mjs\": file has not been read — read the file, then retry",
+          "weight": 4,
+          "hits": 1,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:29.428Z",
+          "notes": [],
+          "umbrella": "tool-recovery"
+        },
+        {
+          "dryRun": true,
+          "id": "o155",
+          "kind": "RECOVERED_FAILURE",
+          "kinds": [
+            "TOOL_FAILURE_OPEN",
+            "RECOVERED_FAILURE"
+          ],
+          "source": "tool",
+          "tool": "edit",
+          "statement": "edit: Error: old_string was not found in \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\package.json\"",
+          "weight": 4,
+          "hits": 1,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:29.388Z",
+          "notes": [],
+          "umbrella": "tool-recovery"
+        },
+        {
+          "dryRun": true,
+          "id": "o154",
+          "kind": "RECOVERED_FAILURE",
+          "kinds": [
+            "TOOL_FAILURE_OPEN",
+            "RECOVERED_FAILURE"
+          ],
+          "source": "tool",
+          "tool": "edit",
+          "statement": "edit: Error: cannot modify \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\lib\\storage.js\": file has not been read — read the file, then retry",
+          "weight": 4,
+          "hits": 1,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:29.243Z",
+          "notes": [],
+          "umbrella": "tool-recovery"
+        },
+        {
+          "dryRun": true,
+          "id": "o138",
+          "kind": "RECOVERED_FAILURE",
+          "kinds": [
+            "TOOL_FAILURE_OPEN",
+            "RECOVERED_FAILURE"
+          ],
+          "source": "tool",
+          "tool": "edit",
+          "statement": "edit: Error: cannot modify \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\README.md\": file has not been read — read the file, then retry",
+          "weight": 4,
+          "hits": 2,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:29.215Z",
+          "notes": [],
+          "umbrella": "tool-recovery"
+        },
+        {
+          "dryRun": true,
+          "id": "o151",
+          "kind": "RECOVERED_FAILURE",
+          "kinds": [
+            "TOOL_FAILURE_OPEN",
+            "RECOVERED_FAILURE"
+          ],
+          "source": "tool",
+          "tool": "read",
+          "statement": "read: <path>C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\scripts\\selftest.mjs</path> <type>file</type> <content> 440: gateObservation( 441: { statement: 'I need to always run node --che…",
+          "weight": 4,
+          "hits": 1,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:29.077Z",
+          "notes": [],
+          "umbrella": "tool-recovery"
+        },
+        {
+          "dryRun": true,
+          "id": "o150",
+          "kind": "RECOVERED_FAILURE",
+          "kinds": [
+            "TOOL_FAILURE_OPEN",
+            "RECOVERED_FAILURE"
+          ],
+          "source": "tool",
+          "tool": "pwsh",
+          "statement": "pwsh: store — lock, state, and the lesson funnel skills — the learned root and rule surgery text — the P0-1 regression and the anti-capture gate regression — the false positives the LIVE run actually produced capture — what is allowed into…",
+          "weight": 4,
+          "hits": 1,
+          "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+          "observedAt": "2026-10-02T03:55:29.058Z",
+          "notes": [],
+          "umbrella": "tool-recovery"
+        }
+      ],
+      "skipped": []
+    }
+  ],
+  "filed": 8,
+  "next": "确认要记的话：learn_review action=run，再用 learn_skill_manage create 落成技能"
+}
+
+=== 如果现在真的跑一次，会提出什么 ===
+{
+  "ok": true,
+  "dryRun": false,
+  "sessions": [
+    {
+      "session": "session-5fc51e8e-256d-48c6-88dd-6f2b9e896985",
+      "observations": 120,
+      "filed": 0,
+      "pendingTotal": 0,
+      "proposals": [],
+      "skipped": [
+        {
+          "statement": "重新审完了。方法：读全部 16 个模块（6900+ 行），**亲自跑了一遍它的自测**，在临时 DSH home 里做了两个针对性探针，并把盘上真实数据与 README 的每一条声明对了一遍。 ## 一、结论先说 这是一次**认真的重写**，不是应付：上一轮我点出的 12 条问题基本全部核销，其中 4 条是被\"结构性地\"解决的（不是打补丁）。方向也对——它接受了我最关键的那条建议：**确定性路径只提议、判决交给模型**。 但它把\"写入权交给模型\"之后，**没有造出任何叫模型…",
+          "reason": "看起来是一次性要求，不是通用规则；缺少可迁移的做法或具体对象（不是一条能照做的规则）：要么写成步骤（先…然后…），要么把命令名、参数、路径、文件名用反引号括起来——门槛就是靠反引号里的东西认出「具体对象」的，例如 `--dry-run`、`lib/text.js`。；读不出可迁移的做法或具体对象"
+        },
+        {
+          "statement": "pwsh: ===== 01-replay.txt ===== 回放库：C:\\Users\\admin\\AppData\\Local\\Temp\\learn-shots 注册工具：learn, learn_review, learn_curator, learn_skill_manage, learn_skills session-5fc51e8e-256d-48c6-88dd-6f2b9e896985 事件 6440（用户 31 · 助手 1028 · 工具 1086） ===…",
+          "reason": "工具输出里读不出具体报错（不是一条能照做的规则）；缺少可迁移的做法或具体对象（不是一条能照做的规则）：要么写成步骤（先…然后…），要么把命令名、参数、路径、文件名用反引号括起来——门槛就是靠反引号里的东西认出「具体对象」的，例如 `--dry-run`、`lib/text.js`。；读不出可迁移的做法或具体对象"
+        },
+        {
+          "statement": "edit: Error: cannot modify \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\scripts\\client-check.mjs\": file has not been read — read the file, then retry",
+          "reason": "是宿主工具的一次自愈报错（工具说明已写明做法），不是可迁移的做法；读不出可迁移的做法或具体对象"
+        },
+        {
+          "statement": "edit: Error: old_string was not found in \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\package.json\"",
+          "reason": "是宿主工具的一次自愈报错（工具说明已写明做法），不是可迁移的做法；读不出可迁移的做法或具体对象"
+        },
+        {
+          "statement": "edit: Error: cannot modify \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\lib\\storage.js\": file has not been read — read the file, then retry",
+          "reason": "是宿主工具的一次自愈报错（工具说明已写明做法），不是可迁移的做法；读不出可迁移的做法或具体对象"
+        },
+        {
+          "statement": "edit: Error: cannot modify \"C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\README.md\": file has not been read — read the file, then retry",
+          "reason": "是宿主工具的一次自愈报错（工具说明已写明做法），不是可迁移的做法；读不出可迁移的做法或具体对象"
+        },
+        {
+          "statement": "read: <path>C:\\Users\\admin\\AppData\\Local\\hermes\\hermes-agent\\apps\\desktop\\release\\win-unpacked\\_agent-learning\\scripts\\selftest.mjs</path> <type>file</type> <content> 440: gateObservation( 441: { statement: 'I need to always run node --che…",
+          "reason": "是过程叙述或插件自身的讨论，不是可迁移的做法；是工具输出的原文（清单/搜索结果/文件内容），不是可迁移的做法；工具输出里读不出具体报错（不是一条能照做的规则）；读不出可迁移的做法或具体对象"
+        },
+        {
+          "statement": "pwsh: store — lock, state, and the lesson funnel skills — the learned root and rule surgery text — the P0-1 regression and the anti-capture gate regression — the false positives the LIVE run actually produced capture — what is allowed into…",
+          "reason": "是过程叙述或插件自身的讨论，不是可迁移的做法；工具输出里读不出具体报错（不是一条能照做的规则）；读不出可迁移的做法或具体对象"
+        }
+      ]
+    }
+  ],
+  "filed": 0,
+  "next": "用 learn action=pending 查看候选"
+}
+
+=== 队列 ===
+候选教训 0 条。自动审查只提出候选、不直接写文件；确认要写成技能时用 learn_skill_manage create。
+
+（回放库留在 C:\Users\admin\AppData\Local\Temp\learn-shots，检查完可以整个删掉。）

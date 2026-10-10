@@ -1,0 +1,12 @@
+回放库：C:\Users\admin\AppData\Local\Temp\learn-shots
+注册工具：learn, learn_review, learn_curator, learn_skill_manage, learn_skills
+
+session-5fc51e8e-256d-48c6-88dd-6f2b9e896985
+  事件 9285（用户 37 · 助手 1494 · 工具 1559）
+候选教训 1 条（已过门槛 1 条）
+- [可写入] pmupbh82229ax｜tool-recovery｜RECOVERED_FAILURE｜命中 1 次
+  陈述：edit: Error: cannot modify "C:\Users\admin\AppData\Local\hermes\hermes-agent\apps\desktop\release\win-unpacked\_agent-learning\package.json": file has not been read — read the file, then retry
+
+确认写入：learn_skill_manage create（或 learn action=note）；放弃：learn action=pending 后由你决定，或用 restore-pending 提升某条。
+
+（回放库留在 C:\Users\admin\AppData\Local\Temp\learn-shots，检查完可以整个删掉。）

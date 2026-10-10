@@ -28,11 +28,11 @@ import { fileURLToPath } from 'node:url';
 
 import { Capture } from '../lib/capture.js';
 import { CONFIG_SHAPE, normalizeConfig } from '../lib/config.js';
-import { createCurator } from '../lib/curator.js';
+import { createCurator, TOUCH_PERSIST_MS } from '../lib/curator.js';
 import { makeExtractor } from '../lib/extract.js';
 import { createGraph } from '../lib/graph.js';
 import { DISCIPLINE_SECTION, RULE_EXCERPT_MAX_CHARS, createHostHooks, guardSkillWrites, isInside, normalizePath, queueNudge, ruleExcerpt } from '../lib/host.js';
-import { migrateOwnSkills, optionalSkillsService, pickSurvivor, probeLearnedRoot } from '../lib/index.js';
+import { findMemoryRoot, migrateOwnSkills, optionalSkillsService, pickSurvivor, probeLearnedRoot } from '../lib/index.js';
 import { createManaged } from '../lib/managed.js';
 import { LEARNED_PROVIDER, LEARNED_RANK, createLearnedProvider, registerLearnedProvider } from '../lib/provider.js';
 import { createReview, parseRuleLine, renderRule, RULE_BUDGET, RULE_BUDGET_CHARS, UMBRELLAS } from '../lib/review.js';
@@ -44,7 +44,7 @@ import {
   screenStatement,
 } from '../lib/sanitize.js';
 import { buildSkillBody, createSkills, fitDescription, parseFrontmatter, slugify } from '../lib/skills.js';
-import { createStore, LEDGER_KEEP_ROTATED, LEDGER_ROTATE_BYTES, LESSONS_KEEP_ROTATED, LESSONS_ROTATE_BYTES, STATE_KEYS } from '../lib/storage.js';
+import { createStore, LEDGER_KEEP_ROTATED, LEDGER_ROTATE_BYTES, LESSONS_KEEP_ROTATED, LESSONS_ROTATE_BYTES, SEEN_MAX, STATE_KEYS } from '../lib/storage.js';
 import { createTools } from '../lib/tools.js';
 import {
   SIGNAL,
@@ -326,6 +326,29 @@ start('store — lock, state, and the lesson funnel');
   eq('savePending queues exactly what it was given', store.loadPending().length, 2);
   store.savePending([]);
   eq('and an empty array empties the queue', store.loadPending().length, 0);
+
+  // The lock is RE-ENTRANT by depth. `review.remember()` opens one transaction
+  // around a whole decision and calls `managed.claim()` inside it, which now takes
+  // the same lock — so an inner acquisition that waited for the outer one would be
+  // waiting for itself. The lock is a file, and `EEXIST` from your own process is
+  // indistinguishable from a stranger's, so the depth counter is the only thing
+  // that can tell the two apart.
+  store.withLock(() => {
+    store.withLock(() => {
+      store.updateState((state) => ({ ...state, rules_written: 7 }));
+    });
+  });
+  eq('a nested lock joins the outer transaction instead of deadlocking', store.loadState().rules_written, 7);
+  check('and the lock file is gone once the outermost frame exits', !existsSync(join(store.dirs.root, '.lock')));
+
+  // `seen.json` is bounded. It exists to stop the same lesson being proposed
+  // twice, and it had no ceiling — so every review that found something new
+  // rewrote the whole file under the lock, and the cost of the guard grew with the
+  // age of the install while the benefit did not.
+  store.rememberFingerprints(Array.from({ length: SEEN_MAX + 25 }, (_, i) => `fp-${i}`));
+  const seenOnDisk = JSON.parse(readFileSync(join(store.dirs.root, 'seen.json'), 'utf8')).fingerprints;
+  eq('the seen-set is capped', seenOnDisk.length, SEEN_MAX);
+  eq('and it drops the oldest, not the newest', seenOnDisk[seenOnDisk.length - 1], `fp-${SEEN_MAX + 24}`);
 }
 
 // ============================================================ 3. skills
@@ -363,6 +386,20 @@ start('skills — the learned root and rule surgery');
   eq('a trailing hyphen is refused', skills.write('my-skill-', { body: '# x\n' }).ok, false);
   eq('doubled hyphens are refused', skills.write('my--skill', { body: '# x\n' }).ok, false);
   check('the refusal names the host rule', /dsh-skill/.test(String(skills.write('my_skill', { body: 'x' }).refused)));
+  // `slugify` had no production caller — exported, and exercised only by this
+  // file, which is the shape the plugin itself calls a write nobody reads. The
+  // refusal is the one place a legal name is genuinely useful: the model has just
+  // handed over an illegal one, so a rejection now carries the correction.
+  check(
+    'the refusal suggests a legal name',
+    /建议改成 `fix-the-build`/.test(String(skills.write('Fix The BUILD!!', { body: 'x' }).refused)),
+    String(skills.write('Fix The BUILD!!', { body: 'x' }).refused),
+  );
+  check(
+    'and stays quiet when there is nothing to suggest',
+    !/建议改成/.test(String(skills.write('!!!', { body: 'x' }).refused)),
+    String(skills.write('!!!', { body: 'x' }).refused),
+  );
   eq('a host-legal name still works', skills.write('my-skill-2', { body: '# x\n', description: 'd', meta: {} }).ok, true);
 
   // The write funnel itself owns description safety. Tool callers screen first,
@@ -426,6 +463,30 @@ start('skills — the learned root and rule surgery');
   const removed = skills.removeRule('durable-preferences', rules[0].id);
   eq('removeRule removes it', removed.ok, true);
   eq('readRules is empty again', skills.readRules('durable-preferences').length, 0);
+
+  // `metaOf()` decides which frontmatter survives a rewrite, and `whenToUse` was
+  // not on its list — so an `undo` or a `consolidate` silently erased the trigger
+  // text: the one field that says WHEN the skill should be loaded. `learn-when` is
+  // kept beside it so a file written before the key was renamed keeps its trigger
+  // through a rewrite too.
+  skills.write('trigger-skill', {
+    description: 'd',
+    body: '# 触发\n\n## 规则\n- 用中文回答\n',
+    meta: { whenToUse: '当有人问中文时' },
+  });
+  eq('whenToUse is written', skills.read('trigger-skill').meta.whenToUse, '当有人问中文时');
+  skills.replaceRule('trigger-skill', skills.readRules('trigger-skill')[0].id, '用中文回答，不要夹英文');
+  eq('and survives a rule rewrite', skills.read('trigger-skill').meta.whenToUse, '当有人问中文时');
+  skills.removeRule('trigger-skill', skills.readRules('trigger-skill')[0].id);
+  eq('and survives the rule being removed', skills.read('trigger-skill').meta.whenToUse, '当有人问中文时');
+
+  skills.write('legacy-trigger', {
+    description: 'd',
+    body: '# 触发\n\n## 规则\n- 用中文回答\n',
+    meta: { 'learn-when': '老的写法' },
+  });
+  skills.removeRule('legacy-trigger', skills.readRules('legacy-trigger')[0].id);
+  eq('a file written with the old key keeps it through a rewrite', skills.read('legacy-trigger').meta['learn-when'], '老的写法');
 }
 
 // ============================================================ 4. text
@@ -1765,6 +1826,29 @@ start('managed — ownership and destruction authority');
   eq('re-claiming preserves the original created time', managed.facts('legacy-skill').created, '2026-01-01T00:00:00.000Z');
   managed.claim('owned-skill', { source: 'activation' });
   eq('and preserves a kind it was not told again', managed.facts('owned-skill').kind, 'class');
+
+  // A write from ANOTHER process must be seen without anyone remembering to call
+  // `invalidate()`. The cache used to be filled once and trusted forever, so a
+  // second dsh instance's claim was invisible here — and this sidecar is the
+  // authority for every destructive path. `utimesSync` moves the mtime explicitly
+  // instead of hoping two writes land in different milliseconds.
+  const other = makeWorld(makeHome('managed-other-process'));
+  other.managed.claim('claimed-by-us', { kind: 'class' });
+  eq('a record we wrote is ours', other.managed.isManaged('claimed-by-us'), true);
+  const rewritten = JSON.parse(readFileSync(other.managed.file, 'utf8'));
+  rewritten.skills['claimed-elsewhere'] = { owner: 'dsh-learn', created: '2026-01-01T00:00:00.000Z' };
+  writeFileSync(other.managed.file, JSON.stringify(rewritten, null, 2));
+  const moved = new Date(Date.now() - 5000);
+  utimesSync(other.managed.file, moved, moved);
+  eq('another process\'s write is seen without invalidate()', other.managed.isManaged('claimed-elsewhere'), true);
+  check('and the record we wrote is still ours', other.managed.isManaged('claimed-by-us'), true);
+  // Every mutation takes the store lock, so a claim made inside somebody else's
+  // transaction joins it instead of deadlocking — `review.remember()` does exactly
+  // that, and it is the shape the lock is re-entrant for.
+  other.store.withLock(() => {
+    other.managed.claim('claimed-inside-a-transaction', { kind: 'umbrella' });
+  });
+  eq('claiming inside an open transaction works', other.managed.isManaged('claimed-inside-a-transaction'), true);
 }
 
 // ============================================================ 8. curator
@@ -1821,6 +1905,49 @@ start('curator — one idle basis, seed-first-tick, archive-only');
   check('it was archived, not deleted', existsSync(join(store.dirs.archive, 'skills')));
 
   check('pin can be set', Boolean(curator.setPinned('owned-skill', true)));
+
+  // `pause` must gate the AUTOMATIC path, not just the one `run` call a human
+  // types. Hermes's `should_run_now()` has always refused while paused; this gate
+  // did not, so `learn_curator action=pause` printed 「自动维护已暂停」 and the timer
+  // went on archiving skills. At this point in the section the gate is open (the
+  // forced pass above moved the clock 100h ahead and the activity clock is
+  // unparseable), which is what makes the contrast meaningful.
+  eq('the automatic gate is open before the pause', curator.shouldRunNow({}).run, true);
+  store.updateState((state) => ({ ...state, curator_paused: true }));
+  const paused = curator.shouldRunNow({});
+  eq('pause closes the automatic gate', paused.run, false);
+  eq('and the reason says which flag did it', paused.paused, true);
+  eq('force stays the documented escape', curator.shouldRunNow({ force: true }).run, true);
+  const pausedTimer = curator.start({ tickMs: 60000 });
+  eq('the timer reaches the same decision the status tool prints', pausedTimer.tick().ran, false);
+  pausedTimer.stop();
+  eq('and a paused pass really does not run', curator.run({}).ran, false);
+  store.updateState((state) => ({ ...state, curator_paused: false }));
+  eq('resuming opens it again', curator.shouldRunNow({}).run, true);
+
+  // The activity clock is throttled: it is written from `session/event`, which
+  // fires for every message and every tool result, and each write was a full
+  // read-modify-write of `state.json` under the lock — for a gate measured in
+  // hours. A fresh world, because the throttle is per-process by design.
+  const tw = makeWorld(makeHome('curator-touch'));
+  const t0 = Date.now();
+  tw.curator.touch(t0);
+  eq('the first touch in a process is persisted', tw.store.loadState().lastActivityAt, t0);
+  eq('a second touch inside the window writes nothing', tw.curator.touch(t0 + 1000), null);
+  eq('so the clock on disk is unchanged', tw.store.loadState().lastActivityAt, t0);
+  const later = t0 + TOUCH_PERSIST_MS + 1;
+  tw.curator.touch(later);
+  eq('past the window it is written again', tw.store.loadState().lastActivityAt, later);
+  eq('and the idle clock still reads from it', tw.curator.idleMs(later + 60000), 60000);
+
+  // `seedIfNeeded` wrote `curator_seeded_at`: unread by anything, and unstorable
+  // anyway, because `STATE_KEYS` is the schema `saveState` filters through and the
+  // key was not in it. Both halves are asserted, so it cannot come back as a
+  // "harmless" third clock.
+  const sw = makeWorld(makeHome('curator-seed'));
+  sw.curator.seedIfNeeded({ now: Date.now() });
+  check('seeding writes no key the schema does not declare', !('curator_seeded_at' in sw.store.loadState()));
+  check('and the schema does not list it', !STATE_KEYS.includes('curator_seeded_at'));
 }
 
 // ============================================================ 9. tools
@@ -1848,6 +1975,14 @@ start('tools — the model-facing boundary');
 
   const status = await call(tools.learn, { action: 'status' });
   check('status reports the learned dir', String(JSON.stringify(status)).includes('learned'));
+  // The memory-node source is stated, not left to a silent zero in the graph's
+  // stats. "this machine has no memory plugin" and "the memory plugin moved its
+  // folder" used to look identical from the outside, and only one is actionable.
+  check(
+    'status says whether the memory nodes are connected',
+    /记忆节点来源/.test(String(status)),
+    String(status).slice(0, 200),
+  );
 
   // The session-scoped line has to work when the model does NOT name a session,
   // because it never does: it calls `learn action=status` from inside the session it
@@ -2274,6 +2409,53 @@ start('provider — the learned root satisfies the host skill contract');
     survivedNoInject = false;
   }
   check('a context with no inject() does not throw either', survivedNoInject);
+
+  // `whenToUse` is the HOST's frontmatter key. This plugin wrote `learn-when`
+  // instead for several versions — a key the provider never read, `search()` never
+  // read, and `metaOf()` dropped on the next rule edit. The reader accepts both
+  // spellings, so a library written before the fix keeps its trigger text with no
+  // migration pass over it.
+  eq('whenToUse reaches the loaded definition', provider.get(beta, {}).whenToUse, '只在 Windows 上');
+  put('legacy-key-skill', '---\nname: legacy-key-skill\ndescription: 老写法\nlearn-when: 命中「老写法」时加载\n---\n\n正文。\n');
+  const legacyRow = provider.list({}).candidates.find((row) => row.name === 'legacy-key-skill');
+  eq('a file written with the old key still carries its trigger', legacyRow.whenToUse, '命中「老写法」时加载');
+  eq('and get() reads it too', provider.get(legacyRow, {}).whenToUse, '命中「老写法」时加载');
+
+  // --- the usage hook: the only honest "this skill was loaded" signal --------
+  //
+  // `list()` runs for the catalog on every collect and says nothing about use;
+  // `get()` runs exactly when the host asks for a body. Counting loads off the
+  // event feed instead produced ZERO records on the live install, which left the
+  // curator's 「still in use」 keep-alive inert: `loads` was always 0, so no skill
+  // was ever "well used" and a busy skill was archived like an abandoned one.
+  const loads = [];
+  const counted = createLearnedProvider({ root, onLoad: (name) => loads.push(name) });
+  counted.list({});
+  sameList('listing the catalog is not a load', loads, []);
+  counted.get(counted.list({}).candidates.find((row) => row.name === 'alpha-skill'), {});
+  sameList('asking for the body is', loads, ['alpha-skill']);
+  const exploding = createLearnedProvider({ root, onLoad: () => { throw new Error('counter exploded'); } });
+  const survivedLoad = exploding.get(exploding.list({}).candidates.find((row) => row.name === 'alpha-skill'), {});
+  eq('a throwing usage hook cannot break a load', survivedLoad.name, 'alpha-skill');
+
+  // The hook is built INSIDE the injection, so `registerLearnedProvider` is the
+  // only place it can be attached — a caller cannot wire it up afterwards.
+  const seenByHook = [];
+  let hookedProvider = null;
+  registerLearnedProvider(
+    {
+      inject(keys, run) {
+        run({
+          skills: { registerProvider(create) { hookedProvider = create({ invalidate() {} }); return () => {}; } },
+          logger: { info() {}, warn() {}, error() {} },
+        });
+      },
+      logger: { info() {}, warn() {}, error() {} },
+    },
+    { root, disposers: [], onLoad: (name) => seenByHook.push(name) },
+  );
+  hookedProvider.get(hookedProvider.list({}).candidates.find((row) => row.name === 'alpha-skill'), {});
+  sameList('the registration forwards the usage hook', seenByHook, ['alpha-skill']);
 }
 
 // ============================================================ 10. migration
@@ -2668,6 +2850,21 @@ start('config — every knob has a reader');
     ].filter((type) => !['string', 'number', 'boolean', 'string[]'].includes(type)),
     [],
   );
+
+  // The memory-node source is a knob and a probe, not a hardcoded path into
+  // another plugin's internals. It used to be
+  // `${dshHome}/.dsh-memory/data/mdcg/contextual`, returned unconditionally — so a
+  // memory plugin that moved its store turned the learning graph's memory nodes
+  // into a silent, permanent zero.
+  eq('the memory root defaults to "probe it"', normalizeConfig({}).memoryRoot, '');
+  eq('and an explicit path is taken as given', normalizeConfig({ memoryRoot: 'D:/nodes' }).memoryRoot, 'D:/nodes');
+  eq('an explicit memory root wins over the probe', findMemoryRoot('/tmp/home', '/custom/nodes'), '/custom/nodes');
+  eq('a missing known layout answers null, not a phantom path', findMemoryRoot(join(SANDBOX, 'no-such-home'), ''), null);
+  const memHome = makeHome('graph-memory-probe');
+  const memLayout = join(memHome, '.dsh-memory', 'data', 'mdcg', 'contextual');
+  mkdirSync(memLayout, { recursive: true });
+  eq('and the known layout is used when it really exists', findMemoryRoot(memHome, ''), memLayout);
+  eq('the graph reports null when there is no memory root', makeWorld(makeHome('graph-none')).graph.memoryRoot, null);
 }
 
 start('host — the guard refuses the wrong door and the nudge stays quiet when there is nothing to say');
@@ -3163,6 +3360,42 @@ start('safety — the guards the mutation testing walked straight through');
   check('a skill with three recorded loads is spared', !swept.includes('well-used'), sweep.moved);
   check('and it is still on disk', cw.skills.exists('well-used'));
 
+  // The same keep-alive, but driven the way PRODUCTION drives it: through the
+  // provider's `get()`. `recordUse` was never wrong — it was never CALLED. On the
+  // live install `usage.json` did not exist at all: the event-feed detector that
+  // was supposed to call it (tool name + callId join + argument shape) never
+  // matched once, so `loads` was 0 for every skill, `wellUsed` was never true, and
+  // the rule above could not fire. This is the wiring that replaced it.
+  const pw = makeWorld(makeHome('safety-load-hook'));
+  // `setLive(true)` is what `index.js` does once the host has proven it can see
+  // the dedicated root. Without it, `skills.write` lands in the SHARED root and a
+  // provider rooted at `learnedDir` would see nothing — which is exactly why the
+  // plugin only trusts the move after the host answers.
+  pw.skills.setLive(true);
+  const providerWired = createLearnedProvider({
+    root: pw.skills.learnedDir,
+    // Production wiring, with only the clock moved back — a fresh `lastLoadAt`
+    // would make `ageDays` small on its own and the skill would survive for the
+    // wrong reason, which is the trap the case above documents.
+    onLoad: (name) => pw.managed.recordUse(name, { session: '', at: oldIso }),
+  });
+  const plantWired = (name) => {
+    pw.skills.write(name, { description: `自测用：${name}`, body: '## 规则\n\n- 先跑 `node --check` 再提交 <!-- r:bb -->\n' });
+    pw.managed.claim(name, { kind: 'class', source: 'test' });
+    const file = pw.skills.fileFor(name);
+    utimesSync(file, new Date(longAgo), new Date(longAgo));
+  };
+  plantWired('loaded-via-provider');
+  plantWired('never-loaded');
+  const rowFor = (name) => providerWired.list({}).candidates.find((row) => row.name === name);
+  for (let i = 0; i < 3; i += 1) providerWired.get(rowFor('loaded-via-provider'), {});
+  eq('three provider loads are three recorded loads', pw.managed.usageOf('loaded-via-provider').loads, 3);
+  eq('and the untouched skill has none', pw.managed.usageOf('never-loaded').loads, 0);
+  const sweep2 = pw.curator.run({ dryRun: false, force: true, now: later });
+  const swept2 = (sweep2.moved || []).map((entry) => entry.name || entry);
+  check('a skill loaded through the provider is spared', !swept2.includes('loaded-via-provider'), sweep2.moved);
+  check('while the untouched one beside it is archived', swept2.includes('never-loaded'), sweep2.moved);
+
   // ---- the agent's own prose, stopped where it ENTERS the window -----------
   // `recordAssistantMessage` accepted any assistant text where
   // `classifyText({source:'assistant'})` fired an explicit bank and
@@ -3213,6 +3446,17 @@ start('safety — the guards the mutation testing walked straight through');
     'and the refusal shows up as a failed check, not six greens',
     judged.checks.some((entry) => entry.id === 'actionable' && entry.ok === false),
     judged.checks,
+  );
+  // There was a sixth check, `durable`, pushed as `push('durable', true, '')` — it
+  // could not fail and was printed as though it had been evaluated. Durability is
+  // genuinely enforced upstream (`gateObservation` refuses a one-off with the
+  // `one-off` code before a lesson reaches these gates), so the second check could
+  // only ever agree. A receipt that lists a check which cannot fail is a claim
+  // made on the reader's behalf.
+  check(
+    'and the receipt carries no check that cannot fail',
+    !judged.checks.some((entry) => entry.id === 'durable'),
+    judged.checks.map((entry) => entry.id),
   );
 
   // F4: nine of sixteen realistic one-turn instructions used to pass this gate

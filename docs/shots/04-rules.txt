@@ -1,0 +1,31 @@
+回放库：C:\Users\admin\AppData\Local\Temp\learn-shots
+注册工具：learn, learn_review, learn_curator, learn_skill_manage, learn_skills
+
+session-5fc51e8e-256d-48c6-88dd-6f2b9e896985
+  事件 11419（用户 43 · 助手 1841 · 工具 1917）
+{
+  "name": "tool-recovery",
+  "file": "C:\\Users\\admin\\AppData\\Local\\Temp\\learn-shots\\skills\\tool-recovery\\SKILL.md",
+  "description": "工具、命令或构建失败后真正修好它的做法：先看什么、按什么顺序排查、哪条命令能复原。命中「报错」时加载。",
+  "rules": [
+    {
+      "id": "5wqq4s",
+      "text": "PowerShell 里把 `Tee-Object -FilePath` 接在 `Select-Object -First` 之后，只会写被截断的前缀：下游提前停机把上游也拆了。要留整份输出，用 `& node ... *> file` 重定向代替。（来自 2026-10-02 · 会话 note · 失败后修复）"
+    },
+    {
+      "id": "12uqz7t",
+      "text": "`robocopy` 复制单个文件时以 16 退出——它把源当成目录处理。单文件用 `Copy-Item -LiteralPath <绝对路径>`。（来自 2026-10-02 · 会话 note · 失败后修复）"
+    },
+    {
+      "id": "12fhvrh",
+      "text": "`ctx.slots.register` 是支持 `order` 的：宿主自己的模板里就写着。grep 在已解包的 28 个文件里搜不到，不等于字段不存在——先看模板再下结论。（来自 2026-10-02 · 会话 note · 有效做法）"
+    }
+  ],
+  "usage": {
+    "loads": 0,
+    "sessions": []
+  },
+  "body": "# 工具/命令失败后的排查与恢复\n\n工具、命令或构建失败后真正修好它的做法：先看什么、按什么顺序排查、哪条命令能复原。命中「报错」时加载。\n\n## 规则\n\n- PowerShell 里把 `Tee-Object -FilePath` 接在 `Select-Object -First` 之后，只会写被截断的前缀：下游提前停机把上游也拆了。要留整份输出，用 `& node ... *> file` 重定向代替。（来自 2026-10-02 · 会话 note · 失败后修复） <!-- r:5wqq4s -->\n\n- `robocopy` 复制单个文件时以 16 退出——它把源当成目录处理。单文件用 `Copy-Item -LiteralPath <绝对路径>`。（来自 2026-10-02 · 会话 note · 失败后修复） <!-- r:12uqz7t -->\n\n- `ctx.slots.register` 是支持 `order` 的：宿主自己的模板里就写着。grep 在已解包的 28 个文件里搜不到，不等于字段不存在——先看模板再下结论。（来自 2026-10-02 · 会话 note · 有效做法） <!-- r:12fhvrh -->\n"
+}
+
+（回放库留在 C:\Users\admin\AppData\Local\Temp\learn-shots，检查完可以整个删掉。）

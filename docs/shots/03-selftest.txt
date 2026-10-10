@@ -1,0 +1,40 @@
+
+sanitize — the single write funnel
+
+store — lock, state, and the lesson funnel
+
+skills — the learned root and rule surgery
+
+text — the P0-1 regression and the anti-capture gate
+
+regression — the false positives the LIVE run actually produced
+
+capture — what is allowed into the window
+
+extract — the real event feed, including the callId join
+
+review — propose, promote, reinforce, consolidate, undo
+
+managed — ownership and destruction authority
+
+curator — one idle basis, seed-first-tick, archive-only
+
+tools — the model-facing boundary
+
+probe — the host decides whether the folder is real
+
+provider — the learned root satisfies the host skill contract
+
+migration — nothing moves until the host can see the folder
+
+migration — a stale shared-root copy cannot shadow the dedicated one
+
+skillfile — the always-on skill file
+
+config — every knob has a reader
+
+repair — real signatures parse
+
+----------------------------------------------------------------
+399/399 checks passed — all green
+sandbox removed: C:\Users\admin\AppData\Local\hermes\hermes-agent\apps\desktop\release\win-unpacked\_agent-learning\.selftest-home
